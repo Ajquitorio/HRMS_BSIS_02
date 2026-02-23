@@ -14,10 +14,10 @@ if (!isset($_SESSION['loggedin']) || $_SESSION['loggedin'] !== true) {
 require_once 'dp.php';
 
 // Database connection
-$host = 'localhost';
-$dbname = 'hr_system';
-$username = 'root';
-$password = '';
+$host = getenv('DB_HOST') ?? 'localhost';
+$dbname = getenv('DB_NAME') ?? 'hr_system';
+$username = getenv('DB_USER') ?? 'root';
+$password = getenv('DB_PASS') ?? '';
 
 try {
     $pdo = new PDO("mysql:host=$host;dbname=$dbname", $username, $password);
@@ -710,9 +710,6 @@ try {
                                         <button class="btn btn-info btn-small" onclick="viewSettlementDetails(<?= $settlement['settlement_id'] ?>)">
                                             📄 View Details
                                         </button>
-                                        <button class="btn btn-warning btn-small" onclick="updateStatus(<?= $settlement['settlement_id'] ?>, '<?= $settlement['status'] ?>')">
-                                            🔄 Update
-                                        </button>
                                     </td>
                                 </tr>
                                 <?php endforeach; ?>
@@ -780,13 +777,21 @@ try {
                         <div class="form-col">
                             <div class="form-group">
                                 <label for="final_salary">Final Salary (₱) *</label>
+<<<<<<< HEAD
                                 <input type="number" id="final_salary" name="final_salary" class="form-control" step="0.01" required readonly style="background-color: #f5f5f5; cursor: not-allowed;" placeholder="Nothing's here yet...">
+=======
+                                <input type="number" id="final_salary" name="final_salary" class="form-control" step="0.01" value="0.00" readonly style="background-color: #f5f5f5; cursor: not-allowed;" placeholder="Nothing's here yet...">
+>>>>>>> 13776b824ff02bbf68eecd564fbb3aa1e513a708
                             </div>
                         </div>
                         <div class="form-col">
                             <div class="form-group">
                                 <label for="severance_pay">Severance Pay (₱)</label>
+<<<<<<< HEAD
                                 <input type="number" id="severance_pay" name="severance_pay" class="form-control" step="0.01" value="0" readonly style="background-color: #f5f5f5; cursor: not-allowed;">
+=======
+                                <input type="number" id="severance_pay" name="severance_pay" class="form-control" step="0.01" value="0.00" readonly style="background-color: #f5f5f5; cursor: not-allowed;" placeholder="Nothing's here yet...">
+>>>>>>> 13776b824ff02bbf68eecd564fbb3aa1e513a708
                             </div>
                         </div>
                     </div>
@@ -795,13 +800,21 @@ try {
                         <div class="form-col">
                             <div class="form-group">
                                 <label for="unused_leave_payout">Unused Leave Payout (₱)</label>
+<<<<<<< HEAD
                                 <input type="number" id="unused_leave_payout" name="unused_leave_payout" class="form-control" step="0.01" value="0" readonly style="background-color: #f5f5f5; cursor: not-allowed;">
+=======
+                                <input type="number" id="unused_leave_payout" name="unused_leave_payout" class="form-control" step="0.01" value="0.00" readonly style="background-color: #f5f5f5; cursor: not-allowed;" placeholder="Nothing's here yet...">
+>>>>>>> 13776b824ff02bbf68eecd564fbb3aa1e513a708
                             </div>
                         </div>
                         <div class="form-col">
                             <div class="form-group">
                                 <label for="deductions">Deductions (₱)</label>
+<<<<<<< HEAD
                                 <input type="number" id="deductions" name="deductions" class="form-control" step="0.01" value="0" readonly style="background-color: #f5f5f5; cursor: not-allowed;">
+=======
+                                <input type="number" id="deductions" name="deductions" class="form-control" step="0.01" value="0.00" readonly style="background-color: #f5f5f5; cursor: not-allowed;" placeholder="Nothing's here yet...">
+>>>>>>> 13776b824ff02bbf68eecd564fbb3aa1e513a708
                             </div>
                         </div>
                     </div>
@@ -836,31 +849,18 @@ try {
                         <div class="form-col">
                             <div class="form-group">
                                 <label for="payment_method">Payment Method</label>
-                                <select id="payment_method" name="payment_method" class="form-control">
-                                    <option value="">Select method...</option>
-                                    <option value="Bank Transfer">Bank Transfer</option>
-                                    <option value="Check">Check</option>
-                                    <option value="Cash">Cash</option>
-                                    <option value="Other">Other</option>
-                                </select>
+                                <input type="text" id="payment_method" name="payment_method" class="form-control" value="Transfer Method" readonly style="background-color: #f5f5f5; cursor: not-allowed;">
                             </div>
                         </div>
                         <div class="form-col">
                             <div class="form-group">
                                 <label for="status">Status *</label>
-                                <select id="status" name="status" class="form-control" required>
-                                    <option value="Pending">Pending</option>
-                                    <option value="Processing">Processing</option>
-                                    <option value="Completed">Completed</option>
-                                </select>
+                                <input type="text" id="status" name="status" class="form-control" value="Settlement Status" readonly style="background-color: #f5f5f5; cursor: not-allowed;">
                             </div>
                         </div>
                     </div>
 
-                    <div class="form-group">
-                        <label for="notes">Notes</label>
-                        <textarea id="notes" name="notes" class="form-control" rows="3" placeholder="Additional notes or comments..."></textarea>
-                    </div>
+                    <input type="hidden" id="notes" name="notes" value="">
 
                     <div style="text-align: center; margin-top: 30px;">
                         <button type="button" class="btn" style="background: #6c757d; color: white; margin-right: 10px;" onclick="closeAddModal()">Cancel</button>

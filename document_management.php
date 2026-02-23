@@ -14,10 +14,10 @@ if (!isset($_SESSION['loggedin']) || $_SESSION['loggedin'] !== true) {
 require_once 'dp.php';
 
 // Database connection
-$host = 'localhost';
-$dbname = 'hr_system';
-$username = 'root';
-$password = '';
+$host = getenv('DB_HOST') ?? 'localhost';
+$dbname = getenv('DB_NAME') ?? 'hr_system';
+$username = getenv('DB_USER') ?? 'root';
+$password = getenv('DB_PASS') ?? '';
 
 try {
     $pdo = new PDO("mysql:host=$host;dbname=$dbname", $username, $password);
@@ -943,8 +943,8 @@ $documentStatuses = ['Active', 'Inactive', 'Expired', 'Pending'];
                                         <button class="btn btn-warning btn-small" onclick="editDocument(<?= $document['document_id'] ?>)" title="Edit">
                                             ✏️ Edit
                                         </button>
-                                        <button class="btn btn-danger btn-small" onclick="deleteDocument(<?= $document['document_id'] ?>)" title="Delete">
-                                            🗑️ Delete
+                                        <button class="btn btn-secondary btn-small" onclick="archiveDocument(<?= $document['document_id'] ?>)" title="Archive">
+                                            📦 Archive
                                         </button>
                                     </td>
                                 </tr>
@@ -1386,7 +1386,7 @@ $documentStatuses = ['Active', 'Inactive', 'Expired', 'Pending'];
             openModal('edit', documentId);
         }
 
-        function deleteDocument(documentId) {
+        function archiveDocument(documentId) {
             const selectedDocument = documentsData.find(doc => doc.document_id == documentId);
             const fileName = selectedDocument && selectedDocument.file_path ? selectedDocument.file_path.split('/').pop() : 'this document';
             
