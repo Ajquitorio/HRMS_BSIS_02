@@ -37,7 +37,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 // Add new checklist item
                 try {
                     // Check if new columns exist, if not use basic insert
-                    $stmt = $pdo->prepare("INSERT INTO exit_checklist (exit_id, item_name, description, responsible_department, status, completed_date, notes, item_type, serial_number, sticker_type, approval_status, approved_by, approved_date, remarks) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+                    $stmt = $pdo->prepare("INSERT INTO exit_checklist (exit_id, item_name, description, responsible_department, status, completed_date, notes, item_type, serial_number, approval_status, approved_by, approved_date, remarks) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
                     $stmt->execute([
                         $_POST['exit_id'],
                         $_POST['item_name'],
@@ -48,7 +48,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         $_POST['notes'],
                         $_POST['item_type'] ?? 'Other',
                         $_POST['serial_number'] ?? '',
-                        $_POST['sticker_type'] ?? '',
                         $_POST['approval_status'] ?? 'Pending',
                         $_POST['approved_by'] ?? null,
                         null,
@@ -87,23 +86,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     // Update checklist item
     try {
         $approved_date = null;
-        $clearance_status = $_POST['clearance_status'] ?? 'Pending';
-        $clearance_date = null;
-        $cleared_by = null;
         
         // Auto-set approval date when approved
         if ($_POST['approval_status'] === 'Approved' && !empty($_POST['approved_by'])) {
             $approved_date = date('Y-m-d');
         }
         
-        // Auto-set clearance when both completed and approved
-        if ($_POST['status'] === 'Completed' && $_POST['approval_status'] === 'Approved') {
-            $clearance_status = 'Cleared';
-            $clearance_date = date('Y-m-d');
-            $cleared_by = $_POST['approved_by'] ?? $_SESSION['username'] ?? 'System';
-        }
-        
-        $stmt = $pdo->prepare("UPDATE exit_checklist SET exit_id=?, item_name=?, description=?, responsible_department=?, status=?, completed_date=?, notes=?, item_type=?, serial_number=?, sticker_type=?, approval_status=?, approved_by=?, approved_date=?, remarks=?, clearance_status=?, clearance_date=?, cleared_by=? WHERE checklist_id=?");
+        $stmt = $pdo->prepare("UPDATE exit_checklist SET exit_id=?, item_name=?, description=?, responsible_department=?, status=?, completed_date=?, notes=?, item_type=?, serial_number=?, approval_status=?, approved_by=?, approved_date=?, remarks=? WHERE checklist_id=?");
         $stmt->execute([
             $_POST['exit_id'],
             $_POST['item_name'],
@@ -114,14 +103,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $_POST['notes'],
             $_POST['item_type'] ?? 'Other',
             $_POST['serial_number'] ?? '',
-            $_POST['sticker_type'] ?? '',
             $_POST['approval_status'] ?? 'Pending',
             $_POST['approved_by'] ?? null,
             $approved_date,
             $_POST['remarks'] ?? '',
-            $clearance_status,
-            $clearance_date,
-            $cleared_by,
             $_POST['checklist_id']
         ]);
         $message = "Exit checklist item updated successfully!";
@@ -735,20 +720,26 @@ $departments = [
             border-radius: 6px;
             font-size: 13px;
             margin-top: 8px;
+            width: 100%;
+            box-sizing: border-box;
         }
 
         .detail-tag {
-            display: inline-block;
+            display: block;
             background: white;
-            padding: 4px 8px;
-            border-radius: 4px;
-            margin-right: 8px;
-            margin-bottom: 5px;
+            padding: 8px 12px;
+            border-radius: 6px;
             border: 1px solid #e0e0e0;
+            font-size: 14px;
+            width: 100%;
+            box-sizing: border-box;
+            word-wrap: break-word;
+            overflow-wrap: break-word;
         }
 
         .detail-tag strong {
             color: var(--azure-blue-dark);
+            font-size: 14px;
         }
 
         .approval-section {
@@ -808,6 +799,380 @@ $departments = [
             border-radius: 4px;
         }
 
+        /* NEW FEATURES STYLES */
+        .feature-section {
+            background: white;
+            border-radius: 10px;
+            margin-bottom: 30px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.08);
+            overflow: hidden;
+        }
+
+        .feature-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 20px;              /* Space between title and button */
+    flex-wrap: wrap;        /* Better responsive handling */
+}
+
+        .feature-header h3 {
+    flex: 1;                /* Takes available space */
+    min-width: 200px;       /* Minimum space for title */
+    white-space: nowrap;    /* Prevents text wrapping */
+}
+
+       .feature-header .btn {
+    flex-shrink: 0;         /* Button stays compact */
+    white-space: nowrap;
+}
+
+        .feature-content {
+            padding: 20px;
+        }
+
+        .clearance-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            margin: 20px 0;
+        }
+
+        .clearance-card {
+            background: white;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            padding: 15px;
+            transition: all 0.3s ease;
+        }
+
+        .clearance-card:hover {
+            border-color: var(--azure-blue);
+            box-shadow: 0 5px 15px rgba(233, 30, 99, 0.2);
+            transform: translateY(-3px);
+        }
+
+        .clearance-card.pending {
+            border-left: 4px solid #ffc107;
+        }
+
+        .clearance-card.approved {
+            border-left: 4px solid #28a745;
+            background: #f0fff4;
+        }
+
+        .clearance-card.returned {
+            border-left: 4px solid #dc3545;
+            background: #fff5f5;
+        }
+
+        .department-label {
+            font-weight: 600;
+            color: var(--azure-blue-dark);
+            font-size: 1rem;
+            margin-bottom: 10px;
+        }
+
+        .clearance-status-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-size: 0.85rem;
+            font-weight: 600;
+            margin: 8px 0;
+        }
+
+        .clearance-status-badge.pending {
+            background: #fff3cd;
+            color: #856404;
+        }
+
+        .clearance-status-badge.approved {
+            background: #d4edda;
+            color: #155724;
+        }
+
+        .clearance-status-badge.returned {
+            background: #f8d7da;
+            color: #721c24;
+        }
+
+        .asset-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 15px 0;
+        }
+
+        .asset-table th {
+            background: #f8f9fa;
+            padding: 12px;
+            text-align: left;
+            border-bottom: 2px solid var(--azure-blue);
+            font-weight: 600;
+            color: var(--azure-blue-dark);
+        }
+
+        .asset-table td {
+            padding: 15px 12px;
+            border-bottom: 1px solid #e0e0e0;
+        }
+
+        .asset-table tbody tr:hover {
+            background: var(--azure-blue-pale);
+        }
+
+        .status-toggle {
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .toggle-switch {
+            position: relative;
+            display: inline-block;
+            width: 50px;
+            height: 24px;
+            background: #ccc;
+            border-radius: 12px;
+            cursor: pointer;
+            transition: background 0.3s ease;
+        }
+
+        .toggle-switch.active {
+            background: #28a745;
+        }
+
+        .toggle-switch::after {
+            content: '';
+            position: absolute;
+            width: 20px;
+            height: 20px;
+            background: white;
+            border-radius: 50%;
+            top: 2px;
+            left: 2px;
+            transition: left 0.3s ease;
+        }
+
+        .toggle-switch.active::after {
+            left: 28px;
+        }
+
+        .condition-indicator {
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 0.85rem;
+            font-weight: 600;
+        }
+
+        .condition-good {
+            background: #d4edda;
+            color: #155724;
+        }
+
+        .condition-damaged {
+            background: #fff3cd;
+            color: #856404;
+        }
+
+        .condition-lost {
+            background: #f8d7da;
+            color: #721c24;
+        }
+
+        .progress-indicator {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin: 20px 0;
+            padding: 15px;
+            background: #f8f9fa;
+            border-radius: 8px;
+        }
+
+        .progress-step {
+            text-align: center;
+            flex: 1;
+            position: relative;
+        }
+
+        .progress-step::after {
+            content: '';
+            position: absolute;
+            top: 20px;
+            right: -25px;
+            width: 50px;
+            height: 2px;
+            background: #e0e0e0;
+        }
+
+        .progress-step:last-child::after {
+            display: none;
+        }
+
+        .progress-circle {
+            width: 40px;
+            height: 40px;
+            background: #e0e0e0;
+            border-radius: 50%;
+            margin: 0 auto 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 600;
+            color: white;
+            transition: all 0.3s ease;
+        }
+
+        .progress-circle.completed {
+            background: #28a745;
+        }
+
+        .progress-circle.current {
+            background: var(--azure-blue);
+            box-shadow: 0 0 15px rgba(233, 30, 99, 0.4);
+        }
+
+        .progress-label {
+            font-size: 0.85rem;
+            font-weight: 600;
+            color: #333;
+        }
+
+        .system-account-item {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 15px;
+            border-left: 4px solid #e0e0e0;
+            transition: all 0.3s ease;
+        }
+
+        .system-account-item.deactivated {
+            border-left-color: #28a745;
+            background: #f0fff4;
+        }
+
+        .system-account-item.active {
+            border-left-color: var(--azure-blue);
+        }
+
+        .account-info {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+
+        .account-name {
+            font-weight: 600;
+            color: var(--azure-blue-dark);
+            font-size: 1rem;
+        }
+
+        .deactivation-timestamp {
+            font-size: 0.85rem;
+            color: #666;
+            margin-top: 8px;
+            padding-top: 8px;
+            border-top: 1px solid #e0e0e0;
+        }
+
+        .proof-upload {
+            margin: 15px 0;
+            padding: 15px;
+            background: #f8f9fa;
+            border-radius: 8px;
+            border: 2px dashed #e0e0e0;
+            text-align: center;
+        }
+
+        .proof-upload:hover {
+            border-color: var(--azure-blue);
+            background: var(--azure-blue-pale);
+        }
+
+        .upload-input {
+            display: none;
+        }
+
+        .file-name {
+            font-size: 0.9rem;
+            color: #333;
+            margin-top: 8px;
+        }
+
+        .clearance-progress {
+            display: flex;
+            gap: 5px;
+            margin: 10px 0;
+        }
+
+        .progress-dot {
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background: #e0e0e0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.7rem;
+            font-weight: 600;
+            color: white;
+        }
+
+        .progress-dot.completed {
+            background: #28a745;
+        }
+
+        .progress-dot.approved {
+            background: var(--azure-blue);
+        }
+
+        .progress-dot.returned {
+            background: #dc3545;
+        }
+        
+        @media (max-width: 768px) {
+            .clearance-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .feature-header {
+                flex-direction: column;
+                gap: 15px;
+                align-items: stretch;
+            }
+
+            .feature-header h3 {
+                margin: 0;
+                white-space: normal;
+                text-align: center;
+            }
+
+            .feature-header .btn {
+                width: 100%;
+                text-align: center;
+            }
+
+            .asset-table {
+                font-size: 0.85rem;
+            }
+
+            .progress-indicator {
+                flex-direction: column;
+            }
+
+            .progress-step::after {
+                display: none;
+            }
+        }
+
         @media (max-width: 768px) {
             .controls {
                 flex-direction: column;
@@ -859,14 +1224,9 @@ $departments = [
                             <span class="search-icon">🔍</span>
                             <input type="text" id="searchInput" placeholder="Search by employee name, department, or item...">
                         </div>
-                        <div>
-                            <button class="btn btn-info" onclick="openBulkUpdateModal()">
-                                📋 Bulk Update
-                            </button>
-                            <button class="btn btn-primary" onclick="openModal('add')">
-                                ➕ Add Checklist Item
-                            </button>
-                        </div>
+                        <button class="btn btn-primary" onclick="openModal('add')">
+                            ➕ Add Checklist Item
+                        </button>
                     </div>
 
                     <!-- Statistics Section -->
@@ -875,7 +1235,6 @@ $departments = [
                         $totalItems = count($checklistItems);
                         $completedItems = count(array_filter($checklistItems, function($item) { return $item['status'] === 'Completed'; }));
                         $pendingItems = count(array_filter($checklistItems, function($item) { return $item['status'] === 'Pending'; }));
-                        $naItems = count(array_filter($checklistItems, function($item) { return $item['status'] === 'Not Applicable'; }));
                         ?>
                         <div class="stat-card">
                             <i class="fas fa-tasks stat-icon" style="color: var(--azure-blue); background: var(--azure-blue-pale);"></i>
@@ -896,13 +1255,6 @@ $departments = [
                             <div class="stat-info">
                                 <div class="stat-number" style="background: linear-gradient(135deg, #ffc107 0%, #e0a800 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent;"><?= $pendingItems ?></div>
                                 <div class="stat-label">Pending</div>
-                            </div>
-                        </div>
-                        <div class="stat-card">
-                            <i class="fas fa-ban stat-icon" style="color: #6c757d; background: #e9ecef;"></i>
-                            <div class="stat-info">
-                                <div class="stat-number" style="background: linear-gradient(135deg, #6c757d 0%, #5a6268 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent;"><?= $naItems ?></div>
-                                <div class="stat-label">Not Applicable</div>
                             </div>
                         </div>
                     </div>
@@ -931,7 +1283,6 @@ $departments = [
                                     <th>Department</th>
                                     <th>Status</th>
                                     <th>Approval</th>
-                                    <th>Clearance</th>
                                     <th>Actions</th>
                                 </tr>
                             </thead>
@@ -954,14 +1305,9 @@ $departments = [
                                             </span>
                                             <strong><?= htmlspecialchars($item['item_name']) ?></strong>
                                         </div>
-                                        <?php if ($item['item_type'] === 'Physical' && ($item['serial_number'] || $item['sticker_type'])): ?>
+                                        <?php if ($item['item_type'] === 'Physical' && $item['serial_number']): ?>
                                         <div class="physical-details">
-                                            <?php if ($item['serial_number']): ?>
                                             <div class="detail-tag">SN: <strong><?= htmlspecialchars($item['serial_number']) ?></strong></div>
-                                            <?php endif; ?>
-                                            <?php if ($item['sticker_type']): ?>
-                                            <div class="detail-tag">Sticker: <strong><?= htmlspecialchars($item['sticker_type']) ?></strong></div>
-                                            <?php endif; ?>
                                         </div>
                                         <?php endif; ?>
                                     </td>
@@ -981,11 +1327,6 @@ $departments = [
                                             <?= date('M d, Y', strtotime($item['approved_date'])) ?>
                                         </div>
                                         <?php endif; ?>
-                                    </td>
-                                    <td>
-                                        <span class="clearance-status <?= $item['status'] === 'Completed' && $item['approval_status'] === 'Approved' ? 'cleared' : 'pending' ?>">
-                                            <?= $item['status'] === 'Completed' && $item['approval_status'] === 'Approved' ? '✓ CLEARED' : '⏳ PENDING' ?>
-                                        </span>
                                     </td>
                                     <td>
                                         <button class="btn btn-info btn-small" onclick="viewChecklistDetails(<?= $item['checklist_id'] ?>)">
@@ -1068,21 +1409,10 @@ $departments = [
                     <div id="physicalDetails" style="display: none;">
                         <div class="approval-section">
                             <h5 style="color: var(--azure-blue-dark); margin-top: 0;">📦 Physical Item Details</h5>
-                            <div class="form-row">
-                                <div class="form-col">
-                                    <div class="form-group">
-                                        <label for="serial_number">Serial Number</label>
-                                        <input type="text" id="serial_number" name="serial_number" class="form-control" 
-                                               placeholder="e.g., SN123456789">
-                                    </div>
-                                </div>
-                                <div class="form-col">
-                                    <div class="form-group">
-                                        <label for="sticker_type">Asset Sticker/Tag</label>
-                                        <input type="text" id="sticker_type" name="sticker_type" class="form-control" 
-                                               placeholder="e.g., AST-2024-001">
-                                    </div>
-                                </div>
+                            <div class="form-group">
+                                <label for="serial_number">Serial Number</label>
+                                <input type="text" id="serial_number" name="serial_number" class="form-control" 
+                                       placeholder="e.g., SN123456789">
                             </div>
                         </div>
                     </div>
@@ -1105,7 +1435,6 @@ $departments = [
                                 <select id="status" name="status" class="form-control" required>
                                     <option value="Pending">Pending</option>
                                     <option value="Completed">Completed</option>
-                                    <option value="Not Applicable">Not Applicable</option>
                                 </select>
                             </div>
                         </div>
@@ -1119,7 +1448,7 @@ $departments = [
 
                     <!-- Approval Section -->
                     <div class="approval-section">
-                        <h5 style="color: var(--azure-blue-dark); margin-top: 0;">✓ Approval & Clearance</h5>
+                        <h5 style="color: var(--azure-blue-dark); margin-top: 0;">✓ Approval</h5>
                         
                         <div class="form-row">
                             <div class="form-col">
@@ -1252,7 +1581,6 @@ $departments = [
             } else {
                 physicalDetails.style.display = 'none';
                 document.getElementById('serial_number').value = '';
-                document.getElementById('sticker_type').value = '';
             }
         }
 
@@ -1293,7 +1621,6 @@ $departments = [
                 document.getElementById('item_type').value = item.item_type || 'Physical';
                 document.getElementById('item_name').value = item.item_name || '';
                 document.getElementById('serial_number').value = item.serial_number || '';
-                document.getElementById('sticker_type').value = item.sticker_type || '';
                 document.getElementById('description').value = item.description || '';
                 document.getElementById('responsible_department').value = item.responsible_department || '';
                 document.getElementById('status').value = item.status || '';
@@ -1313,12 +1640,11 @@ $departments = [
         function viewChecklistDetails(checklistId) {
             const item = checklistData.find(item => item.checklist_id == checklistId);
             if (item) {
-                const physicalInfo = item.item_type === 'Physical' ? `
+                const physicalInfo = item.item_type === 'Physical' && item.serial_number ? `
                     <div style="margin: 15px 0;">
                         <strong style="color: var(--azure-blue-dark);">📦 Physical Item Details:</strong>
                         <div style="margin-top: 10px; padding: 10px; background: #f8f9fa; border-radius: 6px;">
-                            ${item.serial_number ? `<div><strong>Serial Number:</strong> ${item.serial_number}</div>` : ''}
-                            ${item.sticker_type ? `<div><strong>Asset Sticker:</strong> ${item.sticker_type}</div>` : ''}
+                            <div><strong>Serial Number:</strong> ${item.serial_number}</div>
                         </div>
                     </div>
                 ` : '';
@@ -1341,10 +1667,6 @@ $departments = [
                     </div>
                 ` : '';
 
-                const clearanceStatus = item.status === 'Completed' && item.approval_status === 'Approved' 
-                    ? '<span class="clearance-status cleared">✓ CLEARED</span>'
-                    : '<span class="clearance-status pending">⏳ PENDING</span>';
-
                 const detailsHTML = `
                     <div style="padding: 20px;">
                         <h4 style="color: var(--azure-blue); margin-bottom: 20px;">Item: ${item.item_name}</h4>
@@ -1365,11 +1687,6 @@ $departments = [
                         
                         <div style="margin: 15px 0;">
                             <strong>Status:</strong> <span class="status-badge status-${item.status.toLowerCase()}">${item.status}</span>
-                        </div>
-                        
-                        <div style="margin: 15px 0;">
-                            <strong>Clearance:</strong><br>
-                            ${clearanceStatus}
                         </div>
                         
                         ${approvalInfo}
