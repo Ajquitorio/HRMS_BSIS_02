@@ -634,6 +634,32 @@ INSERT INTO `educational_background` (`education_id`, `personal_info_id`, `educa
 -- --------------------------------------------------------
 
 --
+-- Table structure for table `employee_certifications` (for personal/pre-employment certifications)
+--
+
+CREATE TABLE `employee_certifications` (
+  `certification_id` int(11) NOT NULL AUTO_INCREMENT,
+  `personal_info_id` int(11) NOT NULL,
+  `certification_name` varchar(255) NOT NULL,
+  `issuing_organization` varchar(255) NOT NULL,
+  `issue_date` date NOT NULL,
+  `expiry_date` date DEFAULT NULL,
+  `certification_number` varchar(100) DEFAULT NULL,
+  `file_path` varchar(500) DEFAULT NULL,
+  `file_type` varchar(50) DEFAULT NULL,
+  `file_size` int(11) DEFAULT NULL,
+  `obtained_before_joining` tinyint(1) DEFAULT 1 COMMENT 'Whether this cert was obtained before joining the organization',
+  `status` enum('Pending Verification','Verified','Expired','Inactive') DEFAULT 'Pending Verification',
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
+  PRIMARY KEY (`certification_id`),
+  KEY `personal_info_id` (`personal_info_id`),
+  CONSTRAINT `employee_certifications_personal_info_fk` FOREIGN KEY (`personal_info_id`) REFERENCES `personal_information` (`personal_info_id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+-- --------------------------------------------------------
+
+--
 -- Table structure for table `employee_benefits`
 --
 
