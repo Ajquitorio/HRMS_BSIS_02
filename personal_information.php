@@ -1222,21 +1222,29 @@ $personalInfo = $stmt->fetchAll(PDO::FETCH_ASSOC);
         let maritalHistoryData = <?= json_encode($maritalHistoryData) ?>;
         let employeeCertifications = <?= json_encode($employeeCertifications) ?>;
 
-        // Search functionality
-        document.getElementById('searchInput').addEventListener('input', function() {
-            const searchTerm = this.value.toLowerCase();
-            const tableBody = document.getElementById('personalInfoTableBody');
-            const rows = tableBody.getElementsByTagName('tr');
+        // Initialize on page load
+        document.addEventListener('DOMContentLoaded', function() {
+            // Search functionality
+            const searchInput = document.getElementById('searchInput');
+            if (searchInput) {
+                searchInput.addEventListener('input', function() {
+                    const searchTerm = this.value.toLowerCase();
+                    const tableBody = document.getElementById('personalInfoTableBody');
+                    if (tableBody) {
+                        const rows = tableBody.getElementsByTagName('tr');
 
-            for (let i = 0; i < rows.length; i++) {
-                const row = rows[i];
-                const text = row.textContent.toLowerCase();
-                
-                if (text.includes(searchTerm)) {
-                    row.style.display = '';
-                } else {
-                    row.style.display = 'none';
-                }
+                        for (let i = 0; i < rows.length; i++) {
+                            const row = rows[i];
+                            const text = row.textContent.toLowerCase();
+                            
+                            if (text.includes(searchTerm)) {
+                                row.style.display = '';
+                            } else {
+                                row.style.display = 'none';
+                            }
+                        }
+                    }
+                });
             }
         });
 
@@ -1571,38 +1579,50 @@ $personalInfo = $stmt->fetchAll(PDO::FETCH_ASSOC);
             }
         }
 
-        // Form validation
-        document.getElementById('personalInfoForm').addEventListener('submit', function(e) {
-            const firstName = document.getElementById('first_name').value.trim();
-            const lastName = document.getElementById('last_name').value.trim();
-            
-            if (firstName.length < 2) {
-                e.preventDefault();
-                alert('First name must be at least 2 characters long');
-                return;
-            }
-            
-            if (lastName.length < 2) {
-                e.preventDefault();
-                alert('Last name must be at least 2 characters long');
-                return;
-            }
-        });
-
-        // Auto-hide alerts
-        setTimeout(function() {
-            const alerts = document.querySelectorAll('.alert');
-            alerts.forEach(function(alert) {
-                alert.style.transition = 'opacity 0.5s';
-                alert.style.opacity = '0';
-                setTimeout(function() {
-                    alert.remove();
-                }, 500);
-            });
-        }, 5000);
-
         // Initialize on page load
         document.addEventListener('DOMContentLoaded', function() {
+            // Search functionality
+            const searchInput = document.getElementById('searchInput');
+            if (searchInput) {
+                searchInput.addEventListener('input', function() {
+                    const searchTerm = this.value.toLowerCase();
+                    const tableBody = document.getElementById('personalInfoTableBody');
+                    const rows = tableBody.getElementsByTagName('tr');
+
+                    for (let i = 0; i < rows.length; i++) {
+                        const row = rows[i];
+                        const text = row.textContent.toLowerCase();
+                        
+                        if (text.includes(searchTerm)) {
+                            row.style.display = '';
+                        } else {
+                            row.style.display = 'none';
+                        }
+                    }
+                });
+            }
+            
+            // Form validation
+            const personalInfoForm = document.getElementById('personalInfoForm');
+            if (personalInfoForm) {
+                personalInfoForm.addEventListener('submit', function(e) {
+                    const firstName = document.getElementById('first_name').value.trim();
+                    const lastName = document.getElementById('last_name').value.trim();
+                    
+                    if (firstName.length < 2) {
+                        e.preventDefault();
+                        alert('First name must be at least 2 characters long');
+                        return;
+                    }
+                    
+                    if (lastName.length < 2) {
+                        e.preventDefault();
+                        alert('Last name must be at least 2 characters long');
+                        return;
+                    }
+                });
+            }
+
             // Set max date for birth date (today)
             const today = new Date().toISOString().split('T')[0];
             const dateOfBirthInput = document.getElementById('date_of_birth');
@@ -1613,7 +1633,28 @@ $personalInfo = $stmt->fetchAll(PDO::FETCH_ASSOC);
                 const minDate = new Date();
                 minDate.setFullYear(minDate.getFullYear() - 120);
                 dateOfBirthInput.setAttribute('min', minDate.toISOString().split('T')[0]);
+                
+                // Live age calculation on birth date change
+                dateOfBirthInput.addEventListener('change', function() {
+                    const birthDate = this.value;
+                    if (birthDate) {
+                        const age = calculateAge(birthDate);
+                        console.log(`Age will be: ${age} years`);
+                    }
+                });
             }
+            
+            // Auto-hide alerts
+            setTimeout(function() {
+                const alerts = document.querySelectorAll('.alert');
+                alerts.forEach(function(alert) {
+                    alert.style.transition = 'opacity 0.5s';
+                    alert.style.opacity = '0';
+                    setTimeout(function() {
+                        alert.remove();
+                    }, 500);
+                });
+            }, 5000);
         });
 
         // Keyboard shortcuts
@@ -1645,17 +1686,7 @@ $personalInfo = $stmt->fetchAll(PDO::FETCH_ASSOC);
             return age;
         }
 
-        // Live age calculation on birth date change
-        const dateOfBirthInput = document.getElementById('date_of_birth');
-        if (dateOfBirthInput) {
-            dateOfBirthInput.addEventListener('change', function() {
-                const birthDate = this.value;
-                if (birthDate) {
-                    const age = calculateAge(birthDate);
-                    console.log(`Age will be: ${age} years`);
-                }
-            });
-        }
+
 
         // Print PDS function
         function printPDS(personalInfoId) {
