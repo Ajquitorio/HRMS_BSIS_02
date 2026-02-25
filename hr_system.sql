@@ -18,15 +18,12 @@ SET time_zone = "+00:00";
 /*!40101 SET @OLD_COLLATION_CONNECTION=@@COLLATION_CONNECTION */;
 /*!40101 SET NAMES utf8mb4 */;
 
-<<<<<<< HEAD
 --
 -- Database: `hr_system`
 --
-=======
 
 -- --------------------------------------------------------
 
->>>>>>> 13776b824ff02bbf68eecd564fbb3aa1e513a708
 --
 -- Table structure for table `archive_storage`
 --
@@ -773,27 +770,6 @@ CREATE TABLE `employee_onboarding_tasks` (
 -- --------------------------------------------------------
 
 --
-<<<<<<< HEAD
--- Table structure for table employee_profiles
---
-
-CREATE TABLE employee_profiles (
-  employee_id int(11) NOT NULL,
-  personal_info_id int(11) DEFAULT NULL,
-  job_role_id int(11) DEFAULT NULL,
-  employee_number varchar(20) NOT NULL,
-  hire_date date NOT NULL,
-  employment_status enum('Full-time','Part-time','Contract','Intern','Terminated') NOT NULL,
-  work_email varchar(100) DEFAULT NULL,
-  work_phone varchar(20) DEFAULT NULL,
-  location varchar(100) DEFAULT NULL,
-  remote_work tinyint(1) DEFAULT 0,
-  created_at timestamp NOT NULL DEFAULT current_timestamp(),
-  updated_at timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp()
-=======
--- Table structure for table `employee_profiles`
-
---
 -- Table structure for table `employee_profiles`
 --
 
@@ -805,7 +781,7 @@ CREATE TABLE `employee_profiles` (
   `employee_number` varchar(20) NOT NULL,
   `hire_date` date NOT NULL,
   `employment_status` enum('Full-time','Part-time','Contract','Intern','Terminated') NOT NULL,
-  `current_salary` decimal(10,2) NOT NULL,
+  `current_salary` decimal(10,2) DEFAULT NULL,
   `work_email` varchar(100) DEFAULT NULL,
   `work_phone` varchar(20) DEFAULT NULL,
   `location` varchar(100) DEFAULT NULL,
@@ -814,7 +790,6 @@ CREATE TABLE `employee_profiles` (
   `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
   KEY `fk_salary_grade_id` (`salary_grade_id`),
   CONSTRAINT `fk_employee_salary_grade` FOREIGN KEY (`salary_grade_id`) REFERENCES `salary_grades` (`grade_id`) ON DELETE SET NULL ON UPDATE CASCADE
->>>>>>> 13776b824ff02bbf68eecd564fbb3aa1e513a708
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 --
@@ -1013,11 +988,7 @@ CREATE TABLE `exit_checklist` (
   `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp()
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
-<<<<<<< HEAD
-=======
-
 -- --------------------------------------------------------
->>>>>>> 13776b824ff02bbf68eecd564fbb3aa1e513a708
 
 --
 -- Table structure for table `exit_checklist_approvals`
@@ -1776,23 +1747,12 @@ CREATE TABLE `personal_information` (
   `date_of_birth` date NOT NULL,
   `gender` enum('Male','Female','Non-binary','Prefer not to say') NOT NULL,
   `marital_status` enum('Single','Married','Divorced','Widowed') NOT NULL,
-<<<<<<< HEAD
   `marital_status_date` date DEFAULT NULL,
   `spouse_name` varchar(100) DEFAULT NULL,
   `marital_status_document` varchar(255) DEFAULT NULL,
   `document_type` varchar(50) DEFAULT NULL,
   `document_number` varchar(50) DEFAULT NULL,
   `issuing_authority` varchar(150) DEFAULT NULL,
-=======
-  -- Marital Status Details
-  `marital_status_date` date DEFAULT NULL,
-  `spouse_name` varchar(100) DEFAULT NULL,
-  `marital_status_document` varchar(100) DEFAULT NULL,
-  `document_type` enum('Marriage Certificate','Divorce Decree','Death Certificate','Annulment Certificate','None') DEFAULT NULL,
-  `document_number` varchar(50) DEFAULT NULL,
-  `issuing_authority` varchar(150) DEFAULT NULL,
-  -- End of Marital Status Details
->>>>>>> 13776b824ff02bbf68eecd564fbb3aa1e513a708
   `nationality` varchar(50) NOT NULL,
   `tax_id` varchar(20) DEFAULT NULL,
   `gsis_id` varchar(20) DEFAULT NULL COMMENT 'Government Service Insurance System ID',
@@ -1829,30 +1789,8 @@ INSERT INTO `personal_information` (`personal_info_id`, `first_name`, `last_name
 (13, 'Grace', 'Lopez', '1983-09-07', 'Female', 'Married', '2008-01-19', 'David Lopez', 'Marriage Certificate of Grace Santos and David Lopez', 'Marriage Certificate', 'MC-2008-04456', 'Philippine Statistics Authority (PSA)', 'Filipino', '345-78-9012', '345789012', NULL, NULL, '0917-357-8901', 'David Lopez', 'Spouse', '0917-791-2345', 'Bachelor''s Degree', 'Accountancy', 'Far Eastern University', 2005, NULL, 'Certified Public Accountant (CPA), Certified Internal Auditor', 'Tax Planning and Management Seminar', '2025-09-09 02:00:15', '2025-09-09 02:00:15'),
 (14, 'Eduardo', 'Hernandez', '1977-12-03', 'Male', 'Married', '2004-09-25', 'Sofia Hernandez', 'Marriage Certificate of Eduardo Hernandez and Sofia Reyes', 'Marriage Certificate', 'MC-2004-07789', 'Philippine Statistics Authority (PSA)', 'Filipino', '456-89-0123', '456890123', NULL, NULL, '0917-468-9012', 'Sofia Hernandez', 'Spouse', '0917-802-3456', 'Bachelor''s Degree', 'Architecture', 'University of Santo Tomas', 2000, NULL, 'Licensed Architect', 'Sustainable Design Workshop, BIM Training', '2025-09-09 02:00:15', '2025-09-09 02:00:15'),
 (15, 'Rosario', 'Gonzales', '1989-06-28', 'Female', 'Single', NULL, NULL, NULL, 'None', NULL, NULL, 'Filipino', '567-90-1234', '567901234', NULL, NULL, '0917-579-0123', 'Miguel Gonzales', 'Father', '0917-913-4567', 'Bachelor''s Degree', 'Communication Arts', 'University of the Philippines', 2011, NULL, 'Certified Digital Content Creator', 'Video Production Workshop, Social Media Strategy Training', '2025-09-09 02:00:15', '2025-09-09 02:00:15');
---
-<<<<<<< HEAD
--- Dumping data for table `personal_information`
---
 
-INSERT INTO `personal_information` (`personal_info_id`, `first_name`, `last_name`, `date_of_birth`, `gender`, `marital_status`, `marital_status_date`, `spouse_name`, `marital_status_document`, `document_type`, `document_number`, `issuing_authority`, `nationality`, `tax_id`, `social_security_number`, `pag_ibig_id`, `philhealth_id`, `phone_number`, `emergency_contact_name`, `emergency_contact_relationship`, `emergency_contact_phone`, `highest_education_level`, `field_of_study`, `institution_name`, `graduation_year`, `certifications`, `additional_training`, `created_at`, `updated_at`) VALUES
-(1, 'Maria', 'Santos', '1985-03-12', 'Female', 'Married', '2008-06-15', 'Carlos Santos', 'Marriage Certificate', 'Marriage Certificate', 'MC-2008-567890', 'National Statistics Office', 'Filipino', '123-45-6789', '123456789', NULL, NULL, '0917-123-4567', 'Carlos Santos', 'Spouse', '0917-567-8901', 'Bachelor''s Degree', 'Business Administration', 'University of the Philippines', 2007, 'Certified Public Accountant (CPA)', 'Advanced Excel Training, Leadership Workshop', '2025-09-09 02:00:15', '2025-09-09 02:00:15'),
-(2, 'Roberto', 'Cruz', '1978-07-20', 'Male', 'Married', '2003-11-22', 'Elena Cruz', 'Marriage Certificate', 'Marriage Certificate', 'MC-2003-123456', 'National Statistics Office', 'Filipino', '234-56-7890', '234567890', NULL, NULL, '0917-234-5678', 'Elena Cruz', 'Spouse', '0917-678-9012', 'Master''s Degree', 'Information Technology', 'Ateneo de Manila University', 2002, 'Project Management Professional (PMP), ITIL Foundation', 'Agile Scrum Master Training', '2025-09-09 02:00:15', '2025-09-09 02:00:15'),
-(3, 'Jennifer', 'Reyes', '1988-11-08', 'Female', 'Single', NULL, NULL, NULL, NULL, NULL, NULL, 'Filipino', '345-67-8901', '345678901', NULL, NULL, '0917-345-6789', 'Mark Reyes', 'Brother', '0917-789-0123', 'Bachelor''s Degree', 'Marketing', 'De La Salle University', 2010, 'Google Analytics Certification, Digital Marketing Certificate', 'Social Media Marketing Bootcamp', '2025-09-09 02:00:15', '2025-09-09 02:00:15'),
-(4, 'Antonio', 'Garcia', '1975-01-25', 'Male', 'Married', '1998-03-20', 'Rosa Garcia', 'Marriage Certificate', 'Marriage Certificate', 'MC-1998-654321', 'National Statistics Office', 'Filipino', '456-78-9012', '456789012', NULL, NULL, '0917-456-7890', 'Rosa Garcia', 'Spouse', '0917-890-1234', 'Vocational/Technical', 'Automotive Technology', 'Technical Education and Skills Development Authority (TESDA)', 1995, 'NC II Automotive Servicing, Welding NC II', 'Heavy Equipment Operation Training', '2025-09-09 02:00:15', '2025-09-09 02:00:15'),
-(5, 'Lisa', 'Mendoza', '1982-09-14', 'Female', 'Divorced', '2007-08-14', 'Robert Mendoza', 'Decree of Annulment', 'Decree of Annulment', 'DA-2015-789123', 'Regional Trial Court', 'Filipino', '567-89-0123', '567890123', NULL, NULL, '0917-567-8901', 'John Mendoza', 'Father', '0917-901-2345', 'Bachelor''s Degree', 'Nursing', 'University of Santo Tomas', 2004, 'Registered Nurse (RN), Basic Life Support (BLS)', 'Intensive Care Unit (ICU) Specialized Training', '2025-09-09 02:00:15', '2025-09-09 02:00:15'),
-(6, 'Michael', 'Torres', '1980-06-03', 'Male', 'Married', '2004-05-10', 'Anna Torres', 'Marriage Certificate', 'Marriage Certificate', 'MC-2004-456789', 'National Statistics Office', 'Filipino', '678-90-1234', '678901234', NULL, NULL, '0917-678-9012', 'Anna Torres', 'Spouse', '0917-012-3456', 'Bachelor''s Degree', 'Civil Engineering', 'Mapua University', 2002, 'Licensed Civil Engineer, LEED Green Associate', 'Construction Management Seminar', '2025-09-09 02:00:15', '2025-09-09 02:00:15'),
-(7, 'Carmen', 'Dela Cruz', '1987-12-18', 'Female', 'Single', NULL, NULL, NULL, NULL, NULL, NULL, 'Filipino', '789-01-2345', '789012345', NULL, NULL, '0917-789-0123', 'Pedro Dela Cruz', 'Father', '0917-123-4567', 'Bachelor''s Degree', 'Education', 'Philippine Normal University', 2009, 'Licensed Professional Teacher (LPT)', 'Child Psychology Training, Montessori Method Workshop', '2025-09-09 02:00:15', '2025-09-09 02:00:15'),
-(8, 'Ricardo', 'Villanueva', '1970-04-07', 'Male', 'Married', '1995-12-03', 'Diana Villanueva', 'Marriage Certificate', 'Marriage Certificate', 'MC-1995-321654', 'National Statistics Office', 'Filipino', '890-12-3456', '890123456', NULL, NULL, '0917-890-1234', 'Diana Villanueva', 'Spouse', '0917-234-5678', 'High School', NULL, 'San Juan National High School', 1988, 'Sales Excellence Certificate', 'Customer Service Training, Product Knowledge Seminars', '2025-09-09 02:00:15', '2025-09-09 02:00:15'),
-(9, 'Sandra', 'Pascual', '1984-08-29', 'Female', 'Married', '2009-07-18', 'Luis Pascual', 'Marriage Certificate', 'Marriage Certificate', 'MC-2009-987654', 'National Statistics Office', 'Filipino', '901-23-4567', '901234567', NULL, NULL, '0917-901-2345', 'Luis Pascual', 'Spouse', '0917-345-6789', 'Master''s Degree', 'Human Resource Management', 'Asian Institute of Management', 2008, 'SHRM-CP, Certified Compensation Professional', 'Organizational Development Training', '2025-09-09 02:00:15', '2025-09-09 02:00:15'),
-(10, 'Jose', 'Ramos', '1972-05-15', 'Male', 'Married', '1996-09-21', 'Teresa Ramos', 'Marriage Certificate', 'Marriage Certificate', 'MC-1996-654987', 'National Statistics Office', 'Filipino', '012-34-5678', '012345678', NULL, NULL, '0917-012-3456', 'Teresa Ramos', 'Spouse', '0917-456-7890', 'Bachelor''s Degree', 'Electrical Engineering', 'Polytechnic University of the Philippines', 1994, 'Licensed Electrical Engineer', 'Power Systems Analysis Training', '2025-09-09 02:00:15', '2025-09-09 02:00:15'),
-(11, 'Ana', 'Morales', '1986-10-30', 'Female', 'Single', NULL, NULL, NULL, NULL, NULL, NULL, 'Filipino', '123-56-7890', '123567890', NULL, NULL, '0917-135-7890', 'Maria Morales', 'Mother', '0917-579-0123', 'Bachelor''s Degree', 'Psychology', 'University of the Philippines', 2008, 'Licensed Psychologist, Certified Career Coach', 'Cognitive Behavioral Therapy Workshop', '2025-09-09 02:00:15', '2025-09-09 02:00:15'),
-(12, 'Pablo', 'Fernandez', '1979-02-22', 'Male', 'Married', '2001-11-11', 'Carmen Fernandez', 'Marriage Certificate', 'Marriage Certificate', 'MC-2001-741852', 'National Statistics Office', 'Filipino', '234-67-8901', '234678901', NULL, NULL, '0917-246-7890', 'Carmen Fernandez', 'Spouse', '0917-680-1234', 'Vocational/Technical', 'Computer Technology', 'TESDA', 1998, 'Computer Systems Servicing NC II', 'Web Development Bootcamp, Network Administration', '2025-09-09 02:00:15', '2025-09-09 02:00:15'),
-(13, 'Grace', 'Lopez', '1983-09-07', 'Female', 'Married', '2006-02-14', 'David Lopez', 'Marriage Certificate', 'Marriage Certificate', 'MC-2006-369147', 'National Statistics Office', 'Filipino', '345-78-9012', '345789012', NULL, NULL, '0917-357-8901', 'David Lopez', 'Spouse', '0917-791-2345', 'Bachelor''s Degree', 'Accountancy', 'Far Eastern University', 2005, 'Certified Public Accountant (CPA), Certified Internal Auditor', 'Tax Planning and Management Seminar', '2025-09-09 02:00:15', '2025-09-09 02:00:15'),
-(14, 'Eduardo', 'Hernandez', '1977-12-03', 'Male', 'Married', '2001-10-20', 'Sofia Hernandez', 'Marriage Certificate', 'Marriage Certificate', 'MC-2001-852147', 'National Statistics Office', 'Filipino', '456-89-0123', '456890123', NULL, NULL, '0917-468-9012', 'Sofia Hernandez', 'Spouse', '0917-802-3456', 'Bachelor''s Degree', 'Architecture', 'University of Santo Tomas', 2000, 'Licensed Architect', 'Sustainable Design Workshop, BIM Training', '2025-09-09 02:00:15', '2025-09-09 02:00:15'),
-(15, 'Rosario', 'Gonzales', '1989-06-28', 'Female', 'Single', NULL, NULL, NULL, NULL, NULL, NULL, 'Filipino', '567-90-1234', '567901234', NULL, NULL, '0917-579-0123', 'Miguel Gonzales', 'Father', '0917-913-4567', 'Bachelor''s Degree', 'Communication Arts', 'University of the Philippines', 2011, 'Certified Digital Content Creator', 'Video Production Workshop, Social Media Strategy Training', '2025-09-09 02:00:15', '2025-09-09 02:00:15');
-
-=======
->>>>>>> 13776b824ff02bbf68eecd564fbb3aa1e513a708
+-- --------------------------------------------------------
 -- --------------------------------------------------------
 
 --
@@ -2316,11 +2254,6 @@ INSERT INTO `user_roles` (`role_id`, `role_name`, `description`) VALUES
 
 -- --------------------------------------------------------
 
-
-<<<<<<< HEAD
-=======
-
->>>>>>> 13776b824ff02bbf68eecd564fbb3aa1e513a708
 --
 -- Indexes for dumped tables
 --
