@@ -150,7 +150,7 @@ try {
             ep.employee_number,
             CONCAT(pi.first_name, ' ', pi.last_name) as full_name,
             jr.title as job_title,
-            d.department_name,
+            COALESCE(d.department_name, jr.department) as department_name,
             sg.grade_name,
             sg.grade_level,
             ep.current_salary,
@@ -159,7 +159,7 @@ try {
         FROM employee_profiles ep
         LEFT JOIN personal_information pi ON ep.personal_info_id = pi.personal_info_id
         LEFT JOIN job_roles jr ON ep.job_role_id = jr.job_role_id
-        LEFT JOIN departments d ON jr.department = d.department_id
+        LEFT JOIN departments d ON jr.department = d.department_name
         LEFT JOIN salary_grades sg ON ep.salary_grade_id = sg.grade_id
         WHERE ep.employment_status NOT IN ('Terminated', 'Resigned')
         ORDER BY ep.employee_number ASC
@@ -200,7 +200,7 @@ try {
             ep.employee_number,
             CONCAT(pi.first_name, ' ', pi.last_name) as full_name,
             jr.title as job_title,
-            d.department_name,
+            COALESCE(d.department_name, jr.department) as department_name,
             ep.current_salary,
             ep.hire_date,
             TIMESTAMPDIFF(YEAR, ep.hire_date, CURDATE()) as years_of_service,
@@ -208,7 +208,7 @@ try {
         FROM employee_profiles ep
         LEFT JOIN personal_information pi ON ep.personal_info_id = pi.personal_info_id
         LEFT JOIN job_roles jr ON ep.job_role_id = jr.job_role_id
-        LEFT JOIN departments d ON jr.department = d.department_id
+        LEFT JOIN departments d ON jr.department = d.department_name
         WHERE ep.employment_status NOT IN ('Terminated', 'Resigned')
         ORDER BY ep.current_salary DESC
         LIMIT 10

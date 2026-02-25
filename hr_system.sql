@@ -796,22 +796,22 @@ CREATE TABLE `employee_profiles` (
 -- Dumping data for table employee_profiles
 --
 
-INSERT INTO employee_profiles (employee_id, personal_info_id, job_role_id, employee_number, hire_date, employment_status, work_email, work_phone, location, remote_work, created_at, updated_at) VALUES
-(1, 1, 4, 'MUN001', '2019-07-01', 'Full-time', 'maria.santos@municipality.gov.ph', '034-123-0001', 'City Hall - 1st Floor', 0, '2025-09-09 02:00:16', '2025-09-09 02:00:16'),
-(2, 2, 8, 'MUN002', '2018-06-15', 'Full-time', 'roberto.cruz@municipality.gov.ph', '034-123-0002', 'Engineering Building', 0, '2025-09-09 02:00:16', '2025-09-09 02:00:16'),
-(3, 3, 17, 'MUN003', '2020-01-20', 'Full-time', 'jennifer.reyes@municipality.gov.ph', '034-123-0003', 'Municipal Health Office', 0, '2025-09-09 02:00:16', '2025-09-09 02:00:16'),
-(4, 4, 21, 'MUN004', '2019-03-10', 'Full-time', 'antonio.garcia@municipality.gov.ph', '034-123-0004', 'Municipal Engineer\'s Office', 0, '2025-09-09 02:00:16', '2025-09-09 02:00:16'),
-(5, 5, 20, 'MUN005', '2021-09-05', 'Full-time', 'lisa.mendoza@municipality.gov.ph', '034-123-0005', 'Municipal Social Welfare & Development Office', 0, '2025-09-09 02:00:16', '2025-09-09 02:00:16'),
-(6, 6, 25, 'MUN006', '2020-11-12', 'Full-time', 'michael.torres@municipality.gov.ph', '034-123-0006', 'Municipal Accountant\'s Office', 0, '2025-09-09 02:00:16', '2025-09-09 02:00:16'),
-(7, 7, 27, 'MUN007', '2022-02-28', 'Full-time', 'carmen.delacruz@municipality.gov.ph', '034-123-0007', 'Municipal Civil Registrar\'s Office', 0, '2025-09-09 02:00:16', '2025-09-09 02:00:16'),
-(8, 8, 32, 'MUN008', '2021-05-18', 'Full-time', 'ricardo.villanueva@municipality.gov.ph', '034-123-0008', 'General Services Office', 0, '2025-09-09 02:00:16', '2025-09-09 02:00:16'),
-(9, 9, 28, 'MUN009', '2020-09-10', 'Full-time', 'sandra.pascual@municipality.gov.ph', '034-123-0009', 'Municipal Treasurer\'s Office', 0, '2025-09-09 02:00:16', '2025-09-09 02:00:16'),
-(10, 10, 29, 'MUN010', '2019-12-01', 'Full-time', 'jose.ramos@municipality.gov.ph', '034-123-0010', 'Municipal Treasurer\'s Office', 0, '2025-09-09 02:00:16', '2025-09-09 02:00:16'),
-(11, 11, 26, 'MUN011', '2022-04-15', 'Full-time', 'ana.morales@municipality.gov.ph', '034-123-0011', 'Municipal Human Resource & Administrative Office', 0, '2025-09-09 02:00:16', '2025-09-09 02:00:16'),
-(12, 12, 19, 'MUN012', '2021-08-20', 'Full-time', 'pablo.fernandez@municipality.gov.ph', '034-123-0012', 'Municipal Agriculture Office', 0, '2025-09-09 02:00:16', '2025-09-09 02:00:16'),
-(13, 13, 18, 'MUN013', '2020-06-30', 'Full-time', 'grace.lopez@municipality.gov.ph', '034-123-0013', 'Municipal Health Office', 0, '2025-09-09 02:00:16', '2025-09-09 02:00:16'),
-(14, 14, 31, 'MUN014', '2022-01-10', 'Full-time', 'eduardo.hernandez@municipality.gov.ph', '034-123-0014', 'General Services Office', 0, '2025-09-09 02:00:16', '2025-09-09 02:00:16'),
-(15, 15, 33, 'MUN015', '2021-11-05', 'Full-time', 'rosario.gonzales@municipality.gov.ph', '034-123-0015', 'General Services Office', 0, '2025-09-09 02:00:16', '2025-09-09 02:00:16');
+INSERT INTO employee_profiles (employee_id, personal_info_id, job_role_id, employee_number, hire_date, employment_status, current_salary, work_email, work_phone, location, remote_work, created_at, updated_at) VALUES
+(1, 1, 4, 'MUN001', '2019-07-01', 'Full-time', 50000.00, 'maria.santos@municipality.gov.ph', '034-123-0001', 'City Hall - 1st Floor', 0, '2025-09-09 02:00:16', '2025-09-09 02:00:16'),
+(2, 2, 8, 'MUN002', '2018-06-15', 'Full-time', 55000.00, 'roberto.cruz@municipality.gov.ph', '034-123-0002', 'Engineering Building', 0, '2025-09-09 02:00:16', '2025-09-09 02:00:16'),
+(3, 3, 17, 'MUN003', '2020-01-20', 'Full-time', 42000.00, 'jennifer.reyes@municipality.gov.ph', '034-123-0003', 'Municipal Health Office', 0, '2025-09-09 02:00:16', '2025-09-09 02:00:16'),
+(4, 4, 21, 'MUN004', '2019-03-10', 'Full-time', 33000.00, 'antonio.garcia@municipality.gov.ph', '034-123-0004', 'Municipal Engineer\'s Office', 0, '2025-09-09 02:00:16', '2025-09-09 02:00:16'),
+(5, 5, 20, 'MUN005', '2021-09-05', 'Full-time', 40000.00, 'lisa.mendoza@municipality.gov.ph', '034-123-0005', 'Municipal Social Welfare & Development Office', 0, '2025-09-09 02:00:16', '2025-09-09 02:00:16'),
+(6, 6, 25, 'MUN006', '2020-11-12', 'Full-time', 42000.00, 'michael.torres@municipality.gov.ph', '034-123-0006', 'Municipal Accountant\'s Office', 0, '2025-09-09 02:00:16', '2025-09-09 02:00:16'),
+(7, 7, 27, 'MUN007', '2022-02-28', 'Full-time', 32000.00, 'carmen.delacruz@municipality.gov.ph', '034-123-0007', 'Municipal Civil Registrar\'s Office', 0, '2025-09-09 02:00:16', '2025-09-09 02:00:16'),
+(8, 8, 32, 'MUN008', '2021-05-18', 'Full-time', 28000.00, 'ricardo.villanueva@municipality.gov.ph', '034-123-0008', 'General Services Office', 0, '2025-09-09 02:00:16', '2025-09-09 02:00:16'),
+(9, 9, 28, 'MUN009', '2020-09-10', 'Full-time', 25000.00, 'sandra.pascual@municipality.gov.ph', '034-123-0009', 'Municipal Treasurer\'s Office', 0, '2025-09-09 02:00:16', '2025-09-09 02:00:16'),
+(10, 10, 29, 'MUN010', '2019-12-01', 'Full-time', 28000.00, 'jose.ramos@municipality.gov.ph', '034-123-0010', 'Municipal Treasurer\'s Office', 0, '2025-09-09 02:00:16', '2025-09-09 02:00:16'),
+(11, 11, 26, 'MUN011', '2022-04-15', 'Full-time', 30000.00, 'ana.morales@municipality.gov.ph', '034-123-0011', 'Municipal Human Resource & Administrative Office', 0, '2025-09-09 02:00:16', '2025-09-09 02:00:16'),
+(12, 12, 19, 'MUN012', '2021-08-20', 'Full-time', 33000.00, 'pablo.fernandez@municipality.gov.ph', '034-123-0012', 'Municipal Agriculture Office', 0, '2025-09-09 02:00:16', '2025-09-09 02:00:16'),
+(13, 13, 18, 'MUN013', '2020-06-30', 'Full-time', 40000.00, 'grace.lopez@municipality.gov.ph', '034-123-0013', 'Municipal Health Office', 0, '2025-09-09 02:00:16', '2025-09-09 02:00:16'),
+(14, 14, 31, 'MUN014', '2022-01-10', 'Full-time', 30000.00, 'eduardo.hernandez@municipality.gov.ph', '034-123-0014', 'General Services Office', 0, '2025-09-09 02:00:16', '2025-09-09 02:00:16'),
+(15, 15, 33, 'MUN015', '2021-11-05', 'Full-time', 25000.00, 'rosario.gonzales@municipality.gov.ph', '034-123-0015', 'General Services Office', 0, '2025-09-09 02:00:16', '2025-09-09 02:00:16');
 
 -- --------------------------------------------------------
 --
