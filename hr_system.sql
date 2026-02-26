@@ -605,7 +605,7 @@ INSERT INTO `document_management` (`document_id`, `employee_id`, `document_type`
 --
 
 CREATE TABLE `educational_background` (
-  `education_id` int(11) NOT NULL,
+  `education_id` int(11) NOT NULL AUTO_INCREMENT,
   `personal_info_id` int(11) NOT NULL,
   `education_level` enum('Elementary','High School','Vocational','Associate Degree','Bachelor''s Degree','Master''s Degree','Doctoral Degree','Other') NOT NULL,
   `school_name` varchar(150) NOT NULL,
@@ -617,7 +617,8 @@ CREATE TABLE `educational_background` (
   `is_highest_attainment` tinyint(1) DEFAULT 0,
   `document_url` varchar(255) DEFAULT NULL COMMENT 'Diploma or certificate',
   `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
-  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp()
+  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
+  PRIMARY KEY (`education_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 --
@@ -1767,7 +1768,7 @@ INSERT INTO `performance_review_cycles` (`cycle_id`, `cycle_name`, `start_date`,
 -- Modified personal_information table with marital status details
 
 CREATE TABLE `personal_information` (
-  `personal_info_id` int(11) NOT NULL,
+  `personal_info_id` int(11) NOT NULL AUTO_INCREMENT,
   `first_name` varchar(50) NOT NULL,
   `last_name` varchar(50) NOT NULL,
   `date_of_birth` date NOT NULL,
@@ -1796,7 +1797,8 @@ CREATE TABLE `personal_information` (
   `certifications` text DEFAULT NULL,
   `additional_training` text DEFAULT NULL,
   `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
-  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp()
+  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
+  PRIMARY KEY (`personal_info_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 INSERT INTO `personal_information` (`personal_info_id`, `first_name`, `last_name`, `date_of_birth`, `gender`, `marital_status`, `marital_status_date`, `spouse_name`, `marital_status_document`, `document_type`, `document_number`, `issuing_authority`, `nationality`, `tax_id`, `gsis_id`, `pag_ibig_id`, `philhealth_id`, `phone_number`, `emergency_contact_name`, `emergency_contact_relationship`, `emergency_contact_phone`, `highest_education_level`, `field_of_study`, `institution_name`, `graduation_year`, `previous_job_experiences`, `certifications`, `additional_training`, `created_at`, `updated_at`) VALUES
@@ -1816,7 +1818,7 @@ INSERT INTO `personal_information` (`personal_info_id`, `first_name`, `last_name
 (14, 'Eduardo', 'Hernandez', '1977-12-03', 'Male', 'Married', '2004-09-25', 'Sofia Hernandez', 'Marriage Certificate of Eduardo Hernandez and Sofia Reyes', 'Marriage Certificate', 'MC-2004-07789', 'Philippine Statistics Authority (PSA)', 'Filipino', '456-89-0123', '456890123', NULL, NULL, '0917-468-9012', 'Sofia Hernandez', 'Spouse', '0917-802-3456', 'Bachelor''s Degree', 'Architecture', 'University of Santo Tomas', 2000, NULL, 'Licensed Architect', 'Sustainable Design Workshop, BIM Training', '2025-09-09 02:00:15', '2025-09-09 02:00:15'),
 (15, 'Rosario', 'Gonzales', '1989-06-28', 'Female', 'Single', NULL, NULL, NULL, 'None', NULL, NULL, 'Filipino', '567-90-1234', '567901234', NULL, NULL, '0917-579-0123', 'Miguel Gonzales', 'Father', '0917-913-4567', 'Bachelor''s Degree', 'Communication Arts', 'University of the Philippines', 2011, NULL, 'Certified Digital Content Creator', 'Video Production Workshop, Social Media Strategy Training', '2025-09-09 02:00:15', '2025-09-09 02:00:15');
 
--- --------------------------------------------------------
+
 -- --------------------------------------------------------
 
 --
@@ -2399,7 +2401,6 @@ ALTER TABLE `document_management`
 -- Indexes for table `educational_background`
 --
 ALTER TABLE `educational_background`
-  ADD PRIMARY KEY (`education_id`),
   ADD KEY `personal_info_id` (`personal_info_id`);
 
 --
@@ -2743,8 +2744,6 @@ ALTER TABLE `performance_review_cycles`
 --
 -- Indexes for table `personal_information`
 --
-ALTER TABLE `personal_information`
-  ADD PRIMARY KEY (`personal_info_id`);
 
 --
 -- Indexes for table `post_exit_surveys`
@@ -2982,12 +2981,6 @@ ALTER TABLE `development_plans`
 --
 ALTER TABLE `document_management`
   MODIFY `document_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=33;
-
---
--- AUTO_INCREMENT for table `educational_background`
---
-ALTER TABLE `educational_background`
-  MODIFY `education_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=6;
 
 --
 -- AUTO_INCREMENT for table `employee_benefits`
@@ -3248,11 +3241,6 @@ ALTER TABLE `performance_review_cycles`
   MODIFY `cycle_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=5;
 
 --
--- AUTO_INCREMENT for table `personal_information`
---
-ALTER TABLE `personal_information`
-  MODIFY `personal_info_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=16;
-
 --
 -- AUTO_INCREMENT for table `post_exit_surveys`
 --
