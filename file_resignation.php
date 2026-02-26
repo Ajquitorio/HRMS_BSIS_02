@@ -129,13 +129,10 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && !$existing_resignation) {
     $notice_date = trim($_POST['notice_date'] ?? '');
     $exit_date = trim($_POST['exit_date'] ?? '');
     $exit_reason = trim($_POST['exit_reason'] ?? '');
-    $notification_email = trim($_POST['notification_email'] ?? '');
     
     // Validate inputs
-    if (empty($exit_type) || empty($notice_date) || empty($exit_date) || empty($exit_reason) || empty($notification_email)) {
-        $error_message = "Please fill in all required fields, including the email address.";
-    } elseif (!filter_var($notification_email, FILTER_VALIDATE_EMAIL)) {
-        $error_message = "Please provide a valid email address.";
+    if (empty($exit_type) || empty($notice_date) || empty($exit_date) || empty($exit_reason)) {
+        $error_message = "Please fill in all required fields.";
     } else {
         // Validate dates
         $today = date('Y-m-d');
@@ -145,42 +142,18 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && !$existing_resignation) {
             $error_message = "Exit date (last working day) must be after notice date.";
         } else {
             try {
-                // Insert resignation into exits table with employee email
-                $insert_query = "INSERT INTO exits (employee_id, exit_type, exit_reason, notice_date, exit_date, employee_email, status) 
-                               VALUES (?, ?, ?, ?, ?, ?, 'Pending')";
+                // Insert resignation into exits table
+                $insert_query = "INSERT INTO exits (employee_id, exit_type, exit_reason, notice_date, exit_date, status) 
+                               VALUES (?, ?, ?, ?, ?, 'Pending')";
                 
                 $insert_stmt = $conn->prepare($insert_query);
-                $insert_stmt->execute([$employee_id, $exit_type, $exit_reason, $notice_date, $exit_date, $notification_email]);
+                $insert_stmt->execute([$employee_id, $exit_type, $exit_reason, $notice_date, $exit_date]);
                 
                 $resignation_id = $conn->lastInsertId();
                 $reference_number = "RES-" . $resignation_id;
                 
-                // Attempt to send acknowledgement email
-                require_once 'email_helper.php';
-                
-                $email_sent = false;
-                try {
-                    $email_sent = sendResignationAcknowledgement(
-                        $notification_email,
-                        htmlspecialchars($employee['first_name'] ?? '') . ' ' . htmlspecialchars($employee['last_name'] ?? ''),
-                        htmlspecialchars($employee['job_title'] ?? 'Employee'),
-                        htmlspecialchars($employee['department_name'] ?? 'Not Assigned'),
-                        $notice_date,
-                        $exit_date,
-                        $reference_number
-                    );
-                } catch (Exception $e) {
-                    error_log("Email sending exception: " . $e->getMessage());
-                    $email_sent = false;
-                }
-                
                 // Build success message
                 $success_message = "Your resignation has been filed successfully (Reference: <strong>" . $reference_number . "</strong>). ";
-                if ($email_sent) {
-                    $success_message .= "An acknowledgement email has been sent to <strong>" . htmlspecialchars($notification_email) . "</strong>. ";
-                } else {
-                    $success_message .= "Your acknowledgement will be sent to <strong>" . htmlspecialchars($notification_email) . "</strong> shortly. ";
-                }
                 $success_message .= "HR will review your resignation shortly.";
                 
                 // Refresh to show the pending status
@@ -429,15 +402,6 @@ try {
                                 <small class="form-text text-muted">Select your position</small>
                             </div>
                         </div>
-                        
-                        <div class="col-md-12">
-                            <div class="form-group">
-                                <label>Email for Acknowledgement <span class="text-danger">*</span></label>
-                                <input type="email" class="form-control" name="notification_email" 
-                                       placeholder="example@gmail.com" required>
-                                <small class="form-text text-muted">We will send your resignation acknowledgement to this email address</small>
-                            </div>
-                        </div>
                     </div>
                     
                     <hr class="my-4">
@@ -519,27 +483,10 @@ try {
             form.addEventListener('submit', function(e) {
                 var noticeDate = new Date(document.querySelector('input[name="notice_date"]').value);
                 var exitDate = new Date(document.querySelector('input[name="exit_date"]').value);
-                var emailInput = document.querySelector('input[name="notification_email"]');
                 
                 if (exitDate <= noticeDate) {
                     e.preventDefault();
                     alert('Last working day (Exit Date) must be after the notice date.');
-                    return false;
-                }
-                
-                // Validate email format
-                if (!emailInput || emailInput.value.trim() === '') {
-                    e.preventDefault();
-                    alert('Please provide an email address for the resignation acknowledgement.');
-                    emailInput.focus();
-                    return false;
-                }
-                
-                var emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-                if (!emailRegex.test(emailInput.value.trim())) {
-                    e.preventDefault();
-                    alert('Please enter a valid email address.');
-                    emailInput.focus();
                     return false;
                 }
                 
