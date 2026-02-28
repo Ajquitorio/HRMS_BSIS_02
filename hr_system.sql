@@ -1456,6 +1456,92 @@ CREATE TABLE `knowledge_transfers` (
   `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp()
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
+-- ═══════════════════════════════════════════════════════════════
+-- KT TABLES FIX – Run this in phpMyAdmin on hr_system database
+-- WARNING: This drops and recreates kt_documents and
+-- kt_document_versions. Only existing data will be lost.
+-- kt_responsibilities and kt_sessions are NOT affected.
+-- ═══════════════════════════════════════════════════════════════
+
+-- Step 1: Drop old tables (order matters due to any references)
+DROP TABLE IF EXISTS kt_document_versions;
+DROP TABLE IF EXISTS kt_documents;
+
+-- Step 2: Recreate kt_documents with correct column names
+CREATE TABLE kt_documents (
+    document_id         INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    transfer_id         INT UNSIGNED NOT NULL,
+    document_title      VARCHAR(255) NOT NULL,
+    document_type       ENUM('SOP','Manual','Credentials Guide','Workflow Diagram','Training Material','Meeting Notes','Other') NOT NULL DEFAULT 'Other',
+    description         TEXT,
+    current_version_id  INT UNSIGNED DEFAULT 0,
+    created_at          TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at          TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    INDEX idx_transfer  (transfer_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- Step 3: Recreate kt_document_versions with correct column names
+CREATE TABLE kt_document_versions (
+    version_id          INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    document_id         INT UNSIGNED NOT NULL,
+    version_number      SMALLINT UNSIGNED NOT NULL DEFAULT 1,
+    file_path           VARCHAR(500) NOT NULL,
+    file_name           VARCHAR(255) NOT NULL,
+    file_size           BIGINT UNSIGNED DEFAULT 0,
+    uploaded_by_name    VARCHAR(255),
+    upload_date         DATETIME DEFAULT CURRENT_TIMESTAMP,
+    notes               TEXT,
+    INDEX idx_document  (document_id),
+    UNIQUE KEY uq_doc_ver (document_id, version_number)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- Step 4: Also fix kt_responsibilities if it was created with wrong columns
+DROP TABLE IF EXISTS kt_responsibilities;
+CREATE TABLE kt_responsibilities (
+    responsibility_id   INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    transfer_id         INT UNSIGNED NOT NULL,
+    task_name           VARCHAR(255) NOT NULL,
+    description         TEXT,
+    priority            ENUM('High','Medium','Low') NOT NULL DEFAULT 'Medium',
+    priority_order      INT UNSIGNED DEFAULT 0,
+    assigned_receiver   VARCHAR(255),
+    completion_status   ENUM('Pending','In Progress','Completed') NOT NULL DEFAULT 'Pending',
+    is_completed        TINYINT(1) NOT NULL DEFAULT 0,
+    completed_at        DATETIME NULL,
+    remarks             TEXT,
+    created_at          TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at          TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    INDEX idx_transfer  (transfer_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- Step 5: Also fix kt_sessions if needed
+DROP TABLE IF EXISTS kt_sessions;
+CREATE TABLE kt_sessions (
+    session_id          INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    transfer_id         INT UNSIGNED NOT NULL,
+    session_date        DATE NOT NULL,
+    attendees           TEXT NOT NULL,
+    summary             TEXT NOT NULL,
+    action_items        TEXT,
+    meeting_notes_path  VARCHAR(500),
+    created_at          TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at          TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    INDEX idx_transfer  (transfer_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- Step 6: Add missing columns to knowledge_transfers if not already there
+ALTER TABLE knowledge_transfers
+    ADD COLUMN IF NOT EXISTS kt_status ENUM('Pending','Ongoing','Completed') NOT NULL DEFAULT 'Pending',
+    ADD COLUMN IF NOT EXISTS transfer_deadline DATE NULL,
+    ADD COLUMN IF NOT EXISTS created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP;
+
+-- ═══════════════════════════════════════════════════════════════
+-- Also make sure these folders exist on your server:
+--   /uploads/kt_docs/
+--   /uploads/kt_sessions/
+-- ═══════════════════════════════════════════════════════════════
+
 -- --------------------------------------------------------
 
 --
@@ -1839,6 +1925,14 @@ CREATE TABLE `post_exit_surveys` (
   `evaluation_score` int(11) DEFAULT 0,
   `evaluation_criteria` text DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+CREATE TABLE IF NOT EXISTS survey_notifications (
+    notif_id        INT      AUTO_INCREMENT PRIMARY KEY,
+    exit_id         INT      NOT NULL UNIQUE,
+    sent_by_user_id INT      NULL,
+    sent_at         DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    INDEX (exit_id)
+);
 
 -- --------------------------------------------------------
 
@@ -2493,6 +2587,21 @@ ALTER TABLE `exits`
   ADD PRIMARY KEY (`exit_id`),
   ADD KEY `employee_id` (`employee_id`);
 
+  ALTER TABLE exits 
+MODIFY COLUMN status ENUM(
+    'Pending',
+    'Under Review',
+    'Request Revision',
+    'Approved',
+    'Rejected',
+    'Processing',
+    'Clearance Ongoing',
+    'Exit Interview Scheduled',
+    'On Hold',
+    'Withdrawn',
+    'Completed'
+) NOT NULL DEFAULT 'Pending';
+
 --
 -- Indexes for table `exit_checklist`
 --
@@ -2648,6 +2757,73 @@ ALTER TABLE `knowledge_transfers`
   ADD KEY `exit_id` (`exit_id`),
   ADD KEY `employee_id` (`employee_id`);
 
+  -- ═══════════════════════════════════════════════════════════════
+-- KNOWLEDGE TRANSFER SYSTEM – Run this in phpMyAdmin or MySQL
+-- Database: hr_system
+-- ═══════════════════════════════════════════════════════════════
+
+-- 1. Add new columns to existing knowledge_transfers table
+ALTER TABLE knowledge_transfers
+    ADD COLUMN IF NOT EXISTS kt_status ENUM('Pending','Ongoing','Completed') NOT NULL DEFAULT 'Pending',
+    ADD COLUMN IF NOT EXISTS transfer_deadline DATE NULL,
+    ADD COLUMN IF NOT EXISTS created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP;
+
+-- 2. KT RESPONSIBILITIES
+CREATE TABLE IF NOT EXISTS kt_responsibilities (
+    responsibility_id   INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    transfer_id         INT UNSIGNED NOT NULL,
+    task_name           VARCHAR(255) NOT NULL,
+    description         TEXT,
+    priority            ENUM('High','Medium','Low') NOT NULL DEFAULT 'Medium',
+    priority_order      INT UNSIGNED DEFAULT 0,
+    assigned_receiver   VARCHAR(255),
+    completion_status   ENUM('Pending','In Progress','Completed') NOT NULL DEFAULT 'Pending',
+    is_completed        TINYINT(1) NOT NULL DEFAULT 0,
+    completed_at        DATETIME NULL,
+    remarks             TEXT,
+    created_at          TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at          TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- 3. KT DOCUMENTS (master record per document)
+CREATE TABLE IF NOT EXISTS kt_documents (
+    document_id         INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    transfer_id         INT UNSIGNED NOT NULL,
+    document_title      VARCHAR(255) NOT NULL,
+    document_type       ENUM('SOP','Manual','Credentials Guide','Workflow Diagram','Training Material','Meeting Notes','Other') NOT NULL DEFAULT 'Other',
+    description         TEXT,
+    current_version_id  INT UNSIGNED DEFAULT 0,
+    created_at          TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at          TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- 4. KT DOCUMENT VERSIONS (revision history per document)
+CREATE TABLE IF NOT EXISTS kt_document_versions (
+    version_id          INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    document_id         INT UNSIGNED NOT NULL,
+    version_number      SMALLINT UNSIGNED NOT NULL DEFAULT 1,
+    file_path           VARCHAR(500) NOT NULL,
+    file_name           VARCHAR(255) NOT NULL,
+    file_size           BIGINT UNSIGNED DEFAULT 0,
+    uploaded_by_name    VARCHAR(255),
+    upload_date         DATETIME DEFAULT CURRENT_TIMESTAMP,
+    notes               TEXT
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- 5. KT SESSIONS (knowledge sharing meetings)
+CREATE TABLE IF NOT EXISTS kt_sessions (
+    session_id          INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    transfer_id         INT UNSIGNED NOT NULL,
+    session_date        DATE NOT NULL,
+    attendees           TEXT NOT NULL,
+    summary             TEXT NOT NULL,
+    action_items        TEXT,
+    meeting_notes_path  VARCHAR(500),
+    created_at          TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at          TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
 --
 -- Indexes for table `learning_resources`
 --
@@ -2752,6 +2928,9 @@ ALTER TABLE `post_exit_surveys`
   ADD PRIMARY KEY (`survey_id`),
   ADD KEY `employee_id` (`employee_id`),
   ADD KEY `exit_id` (`exit_id`);
+
+  ALTER TABLE post_exit_surveys 
+ADD COLUMN submitted_by_employee TINYINT(1) NOT NULL DEFAULT 0;
 
 --
 -- Indexes for table `public_holidays`
