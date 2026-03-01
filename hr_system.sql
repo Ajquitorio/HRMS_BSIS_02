@@ -8,6 +8,7 @@
 -- PHP Version: 8.2.12
 
 SET SQL_MODE = "NO_AUTO_VALUE_ON_ZERO";
+SET FOREIGN_KEY_CHECKS = 0;
 START TRANSACTION;
 SET time_zone = "+00:00";
 
@@ -20,29 +21,6 @@ SET time_zone = "+00:00";
 --
 -- Database: `hr_system`
 --
-
-DELIMITER $$
---
--- Procedures
---
-CREATE DEFINER=`root`@`localhost` PROCEDURE `update_clearance_status` (IN `p_checklist_id` INT)   BEGIN
-    DECLARE v_status VARCHAR(20);
-    DECLARE v_approval VARCHAR(20);
-    
-    SELECT status, approval_status INTO v_status, v_approval
-    FROM exit_checklist
-    WHERE checklist_id = p_checklist_id;
-    
-    IF v_status = 'Completed' AND v_approval = 'Approved' THEN
-        UPDATE exit_checklist
-        SET clearance_status = 'Cleared',
-            clearance_date = CURDATE(),
-            cleared_by = COALESCE(approved_by, 'System')
-        WHERE checklist_id = p_checklist_id;
-    END IF;
-END$$
-
-DELIMITER ;
 
 -- --------------------------------------------------------
 
@@ -83,7 +61,6 @@ INSERT INTO `archive_storage` (`archive_id`, `source_table`, `record_id`, `emplo
 (8, 'employment_history', 18, 18, '{\r\n  \"history_id\": 18,\r\n  \"employee_id\": 18,\r\n  \"job_title\": \"Budget Analyst\",\r\n  \"department_id\": 4,\r\n  \"employment_type\": \"Full-time\",\r\n  \"start_date\": \"2019-09-01\",\r\n  \"end_date\": \"2025-09-30\",\r\n  \"employment_status\": \"Resigned\",\r\n  \"reporting_manager_id\": null,\r\n  \"location\": \"Municipal Budget Office\",\r\n  \"base_salary\": 42000.00,\r\n  \"allowances\": 3000.00,\r\n  \"bonuses\": 5000.00,\r\n  \"salary_adjustments\": 2000.00,\r\n  \"reason_for_change\": \"Resigned for career advancement opportunity abroad\",\r\n  \"promotions_transfers\": \"Promoted from Administrative Aide in 2021\",\r\n  \"duties_responsibilities\": \"Analyzed budget data and prepared financial reports for municipal operations.\",\r\n  \"performance_evaluations\": \"Consistently rated Outstanding. Received Best Employee Award 2023.\",\r\n  \"training_certifications\": \"Financial Planning Certification, Advanced Excel Training\",\r\n  \"contract_details\": \"Regular plantilla position\",\r\n  \"remarks\": \"Excellent employee. Provided comprehensive turnover documentation. Eligible for rehire.\",\r\n  \"created_at\": \"2019-09-01 02:00:00\",\r\n  \"updated_at\": \"2025-09-30 10:15:00\"\r\n}', 'Resignation', 'Employee resigned in good standing for overseas employment', 1, '2025-09-30 14:00:00', 1, NULL, NULL, 'Exit clearance completed. Certificate of Employment issued.', '2026-01-20 02:55:57', '2026-01-20 02:55:57');
 
 -- --------------------------------------------------------
-
 --
 -- Table structure for table `attendance`
 --
@@ -628,7 +605,7 @@ INSERT INTO `document_management` (`document_id`, `employee_id`, `document_type`
 --
 
 CREATE TABLE `educational_background` (
-  `education_id` int(11) NOT NULL,
+  `education_id` int(11) NOT NULL AUTO_INCREMENT,
   `personal_info_id` int(11) NOT NULL,
   `education_level` enum('Elementary','High School','Vocational','Associate Degree','Bachelor''s Degree','Master''s Degree','Doctoral Degree','Other') NOT NULL,
   `school_name` varchar(150) NOT NULL,
@@ -640,7 +617,8 @@ CREATE TABLE `educational_background` (
   `is_highest_attainment` tinyint(1) DEFAULT 0,
   `document_url` varchar(255) DEFAULT NULL COMMENT 'Diploma or certificate',
   `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
-  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp()
+  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
+  PRIMARY KEY (`education_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 --
@@ -653,6 +631,32 @@ INSERT INTO `educational_background` (`education_id`, `personal_info_id`, `educa
 (3, 3, 'Bachelor\'s Degree', 'Far Eastern University', 'Bachelor of Science in Nursing', 'Nursing', '2006', '2010', NULL, 1, '/documents/diplomas/jennifer_reyes_bsn.pdf', '2026-01-20 02:55:57', '2026-01-20 02:55:57'),
 (4, 4, 'Vocational', 'Technical Education and Skills Development Authority', 'Computer-Aided Design', 'CAD Operations', '1993', '1995', NULL, 1, '/documents/certificates/antonio_garcia_cad_cert.pdf', '2026-01-20 02:55:57', '2026-01-20 02:55:57'),
 (5, 5, 'Master\'s Degree', 'University of Santo Tomas', 'Master of Social Work', 'Community Development', '2008', '2012', NULL, 1, '/documents/diplomas/lisa_mendoza_msw.pdf', '2026-01-20 02:55:57', '2026-01-20 02:55:57');
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `employee_certifications` (for personal/pre-employment certifications)
+--
+
+CREATE TABLE `employee_certifications` (
+  `certification_id` int(11) NOT NULL AUTO_INCREMENT,
+  `personal_info_id` int(11) NOT NULL,
+  `certification_name` varchar(255) NOT NULL,
+  `issuing_organization` varchar(255) NOT NULL,
+  `issue_date` date NOT NULL,
+  `expiry_date` date DEFAULT NULL,
+  `certification_number` varchar(100) DEFAULT NULL,
+  `file_path` varchar(500) DEFAULT NULL,
+  `file_type` varchar(50) DEFAULT NULL,
+  `file_size` int(11) DEFAULT NULL,
+  `obtained_before_joining` tinyint(1) DEFAULT 1 COMMENT 'Whether this cert was obtained before joining the organization',
+  `status` enum('Pending Verification','Verified','Expired','Inactive') DEFAULT 'Pending Verification',
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
+  PRIMARY KEY (`certification_id`),
+  KEY `personal_info_id` (`personal_info_id`),
+  CONSTRAINT `employee_certifications_personal_info_fk` FOREIGN KEY (`personal_info_id`) REFERENCES `personal_information` (`personal_info_id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 -- --------------------------------------------------------
 
@@ -800,41 +804,43 @@ CREATE TABLE `employee_profiles` (
   `employee_id` int(11) NOT NULL,
   `personal_info_id` int(11) DEFAULT NULL,
   `job_role_id` int(11) DEFAULT NULL,
+  `salary_grade_id` int(11) DEFAULT NULL COMMENT 'Foreign key to salary_grades table',
   `employee_number` varchar(20) NOT NULL,
   `hire_date` date NOT NULL,
   `employment_status` enum('Full-time','Part-time','Contract','Intern','Terminated') NOT NULL,
-  `current_salary` decimal(10,2) NOT NULL,
+  `current_salary` decimal(10,2) DEFAULT NULL,
   `work_email` varchar(100) DEFAULT NULL,
   `work_phone` varchar(20) DEFAULT NULL,
   `location` varchar(100) DEFAULT NULL,
   `remote_work` tinyint(1) DEFAULT 0,
   `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
-  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp()
+  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
+  KEY `fk_salary_grade_id` (`salary_grade_id`),
+  CONSTRAINT `fk_employee_salary_grade` FOREIGN KEY (`salary_grade_id`) REFERENCES `salary_grades` (`grade_id`) ON DELETE SET NULL ON UPDATE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 --
--- Dumping data for table `employee_profiles`
+-- Dumping data for table employee_profiles
 --
 
-INSERT INTO `employee_profiles` (`employee_id`, `personal_info_id`, `job_role_id`, `employee_number`, `hire_date`, `employment_status`, `current_salary`, `work_email`, `work_phone`, `location`, `remote_work`, `created_at`, `updated_at`) VALUES
-(1, 1, 4, 'MUN001', '2019-07-01', 'Full-time', 65000.00, 'maria.santos@municipality.gov.ph', '034-123-0001', 'City Hall - 1st Floor', 0, '2025-09-09 02:00:16', '2025-09-09 02:00:16'),
-(2, 2, 8, 'MUN002', '2018-06-15', 'Full-time', 75000.00, 'roberto.cruz@municipality.gov.ph', '034-123-0002', 'Engineering Building', 0, '2025-09-09 02:00:16', '2025-09-09 02:00:16'),
+INSERT INTO employee_profiles (employee_id, personal_info_id, job_role_id, employee_number, hire_date, employment_status, current_salary, work_email, work_phone, location, remote_work, created_at, updated_at) VALUES
+(1, 1, 4, 'MUN001', '2019-07-01', 'Full-time', 50000.00, 'maria.santos@municipality.gov.ph', '034-123-0001', 'City Hall - 1st Floor', 0, '2025-09-09 02:00:16', '2025-09-09 02:00:16'),
+(2, 2, 8, 'MUN002', '2018-06-15', 'Full-time', 55000.00, 'roberto.cruz@municipality.gov.ph', '034-123-0002', 'Engineering Building', 0, '2025-09-09 02:00:16', '2025-09-09 02:00:16'),
 (3, 3, 17, 'MUN003', '2020-01-20', 'Full-time', 42000.00, 'jennifer.reyes@municipality.gov.ph', '034-123-0003', 'Municipal Health Office', 0, '2025-09-09 02:00:16', '2025-09-09 02:00:16'),
-(4, 4, 21, 'MUN004', '2019-03-10', 'Full-time', 38000.00, 'antonio.garcia@municipality.gov.ph', '034-123-0004', 'Municipal Engineer\'s Office', 0, '2025-09-09 02:00:16', '2025-09-09 02:00:16'),
-(5, 5, 20, 'MUN005', '2021-09-05', 'Full-time', 45000.00, 'lisa.mendoza@municipality.gov.ph', '034-123-0005', 'Municipal Social Welfare & Development Office', 0, '2025-09-09 02:00:16', '2025-09-09 02:00:16'),
-(6, 6, 25, 'MUN006', '2020-11-12', 'Full-time', 28000.00, 'michael.torres@municipality.gov.ph', '034-123-0006', 'Municipal Accountant\'s Office', 0, '2025-09-09 02:00:16', '2025-09-09 02:00:16'),
-(7, 7, 27, 'MUN007', '2022-02-28', 'Full-time', 30000.00, 'carmen.delacruz@municipality.gov.ph', '034-123-0007', 'Municipal Civil Registrar\'s Office', 0, '2025-09-09 02:00:16', '2025-09-09 02:00:16'),
-(8, 8, 32, 'MUN008', '2021-05-18', 'Full-time', 22000.00, 'ricardo.villanueva@municipality.gov.ph', '034-123-0008', 'General Services Office', 0, '2025-09-09 02:00:16', '2025-09-09 02:00:16'),
-(9, 9, 28, 'MUN009', '2020-09-10', 'Full-time', 32000.00, 'sandra.pascual@municipality.gov.ph', '034-123-0009', 'Municipal Treasurer\'s Office', 0, '2025-09-09 02:00:16', '2025-09-09 02:00:16'),
-(10, 10, 29, 'MUN010', '2019-12-01', 'Full-time', 35000.00, 'jose.ramos@municipality.gov.ph', '034-123-0010', 'Municipal Treasurer\'s Office', 0, '2025-09-09 02:00:16', '2025-09-09 02:00:16'),
-(11, 11, 26, 'MUN011', '2022-04-15', 'Full-time', 28000.00, 'ana.morales@municipality.gov.ph', '034-123-0011', 'Municipal Human Resource & Administrative Office', 0, '2025-09-09 02:00:16', '2025-09-09 02:00:16'),
-(12, 12, 19, 'MUN012', '2021-08-20', 'Full-time', 40000.00, 'pablo.fernandez@municipality.gov.ph', '034-123-0012', 'Municipal Agriculture Office', 0, '2025-09-09 02:00:16', '2025-09-09 02:00:16'),
-(13, 13, 18, 'MUN013', '2020-06-30', 'Full-time', 42000.00, 'grace.lopez@municipality.gov.ph', '034-123-0013', 'Municipal Health Office', 0, '2025-09-09 02:00:16', '2025-09-09 02:00:16'),
-(14, 14, 31, 'MUN014', '2022-01-10', 'Full-time', 25000.00, 'eduardo.hernandez@municipality.gov.ph', '034-123-0014', 'General Services Office', 0, '2025-09-09 02:00:16', '2025-09-09 02:00:16'),
-(15, 15, 33, 'MUN015', '2021-11-05', 'Full-time', 24000.00, 'rosario.gonzales@municipality.gov.ph', '034-123-0015', 'General Services Office', 0, '2025-09-09 02:00:16', '2025-09-09 02:00:16');
+(4, 4, 21, 'MUN004', '2019-03-10', 'Full-time', 33000.00, 'antonio.garcia@municipality.gov.ph', '034-123-0004', 'Municipal Engineer\'s Office', 0, '2025-09-09 02:00:16', '2025-09-09 02:00:16'),
+(5, 5, 20, 'MUN005', '2021-09-05', 'Full-time', 40000.00, 'lisa.mendoza@municipality.gov.ph', '034-123-0005', 'Municipal Social Welfare & Development Office', 0, '2025-09-09 02:00:16', '2025-09-09 02:00:16'),
+(6, 6, 25, 'MUN006', '2020-11-12', 'Full-time', 42000.00, 'michael.torres@municipality.gov.ph', '034-123-0006', 'Municipal Accountant\'s Office', 0, '2025-09-09 02:00:16', '2025-09-09 02:00:16'),
+(7, 7, 27, 'MUN007', '2022-02-28', 'Full-time', 32000.00, 'carmen.delacruz@municipality.gov.ph', '034-123-0007', 'Municipal Civil Registrar\'s Office', 0, '2025-09-09 02:00:16', '2025-09-09 02:00:16'),
+(8, 8, 32, 'MUN008', '2021-05-18', 'Full-time', 28000.00, 'ricardo.villanueva@municipality.gov.ph', '034-123-0008', 'General Services Office', 0, '2025-09-09 02:00:16', '2025-09-09 02:00:16'),
+(9, 9, 28, 'MUN009', '2020-09-10', 'Full-time', 25000.00, 'sandra.pascual@municipality.gov.ph', '034-123-0009', 'Municipal Treasurer\'s Office', 0, '2025-09-09 02:00:16', '2025-09-09 02:00:16'),
+(10, 10, 29, 'MUN010', '2019-12-01', 'Full-time', 28000.00, 'jose.ramos@municipality.gov.ph', '034-123-0010', 'Municipal Treasurer\'s Office', 0, '2025-09-09 02:00:16', '2025-09-09 02:00:16'),
+(11, 11, 26, 'MUN011', '2022-04-15', 'Full-time', 30000.00, 'ana.morales@municipality.gov.ph', '034-123-0011', 'Municipal Human Resource & Administrative Office', 0, '2025-09-09 02:00:16', '2025-09-09 02:00:16'),
+(12, 12, 19, 'MUN012', '2021-08-20', 'Full-time', 33000.00, 'pablo.fernandez@municipality.gov.ph', '034-123-0012', 'Municipal Agriculture Office', 0, '2025-09-09 02:00:16', '2025-09-09 02:00:16'),
+(13, 13, 18, 'MUN013', '2020-06-30', 'Full-time', 40000.00, 'grace.lopez@municipality.gov.ph', '034-123-0013', 'Municipal Health Office', 0, '2025-09-09 02:00:16', '2025-09-09 02:00:16'),
+(14, 14, 31, 'MUN014', '2022-01-10', 'Full-time', 30000.00, 'eduardo.hernandez@municipality.gov.ph', '034-123-0014', 'General Services Office', 0, '2025-09-09 02:00:16', '2025-09-09 02:00:16'),
+(15, 15, 33, 'MUN015', '2021-11-05', 'Full-time', 25000.00, 'rosario.gonzales@municipality.gov.ph', '034-123-0015', 'General Services Office', 0, '2025-09-09 02:00:16', '2025-09-09 02:00:16');
 
 -- --------------------------------------------------------
-
 --
 -- Table structure for table `employee_resources`
 --
@@ -903,26 +909,34 @@ CREATE TABLE `employee_skills` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 -- --------------------------------------------------------
-
---
--- Table structure for table `employment_history`
---
+-- ============================================================
+-- EXPANDED EMPLOYMENT HISTORY (INTERNAL)
+-- Added new columns to support richer internal tracking
+-- ============================================================
 
 CREATE TABLE `employment_history` (
-  `history_id` int(11) NOT NULL,
+  `history_id` int(11) NOT NULL AUTO_INCREMENT,
   `employee_id` int(11) NOT NULL,
   `job_title` varchar(150) NOT NULL,
+  `salary_grade` varchar(50) DEFAULT NULL,
   `department_id` int(11) DEFAULT NULL,
   `employment_type` enum('Full-time','Part-time','Contractual','Project-based','Casual','Intern') NOT NULL,
   `start_date` date NOT NULL,
   `end_date` date DEFAULT NULL,
-  `employment_status` enum('Active','Resigned','Terminated','Retired','End of Contract','Transferred') NOT NULL,
+  `employment_status` enum('Active','Resigned','Terminated','Retired','End of Contract','Transferred','Promoted','Demoted','Lateral Move') NOT NULL,
   `reporting_manager_id` int(11) DEFAULT NULL,
   `location` varchar(150) DEFAULT NULL,
   `base_salary` decimal(10,2) NOT NULL,
   `allowances` decimal(10,2) DEFAULT 0.00,
   `bonuses` decimal(10,2) DEFAULT 0.00,
   `salary_adjustments` decimal(10,2) DEFAULT 0.00,
+  `salary_effective_date` date DEFAULT NULL,
+  `salary_increase_amount` decimal(10,2) DEFAULT 0.00,
+  `salary_increase_percentage` decimal(5,2) DEFAULT 0.00,
+  `previous_salary` decimal(10,2) DEFAULT NULL,
+  `position_sequence` int(11) DEFAULT 1,
+  `is_current_position` tinyint(1) DEFAULT 0,
+  `promotion_type` enum('Initial Hire','Promotion','Demotion','Lateral Move','Rehire') DEFAULT NULL,
   `reason_for_change` varchar(255) DEFAULT NULL,
   `promotions_transfers` text DEFAULT NULL,
   `duties_responsibilities` text DEFAULT NULL,
@@ -931,32 +945,559 @@ CREATE TABLE `employment_history` (
   `contract_details` text DEFAULT NULL,
   `remarks` text DEFAULT NULL,
   `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
-  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp()
+  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
+  PRIMARY KEY (`history_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
---
--- Dumping data for table `employment_history`
---
+-- (Original INSERT data retained as-is — no changes needed to internal history)
+INSERT INTO `employment_history` (`history_id`, `employee_id`, `job_title`, `salary_grade`, `department_id`, `employment_type`, `start_date`, `end_date`, `employment_status`, `reporting_manager_id`, `location`, `base_salary`, `allowances`, `bonuses`, `salary_adjustments`, `salary_effective_date`, `salary_increase_amount`, `salary_increase_percentage`, `previous_salary`, `position_sequence`, `is_current_position`, `promotion_type`, `reason_for_change`, `promotions_transfers`, `duties_responsibilities`, `performance_evaluations`, `training_certifications`, `contract_details`, `remarks`, `created_at`, `updated_at`) VALUES
+(1, 1, 'Municipal Treasurer', 'Grade 32', 3, 'Full-time', '2019-07-01', NULL, 'Active', NULL, 'City Hall - 1st Floor', 65000.00, 5000.00, 0.00, 0.00, '2019-07-01', 15000.00, 30.00, 50000.00, 2, 1, 'Promotion', 'Appointed as Municipal Treasurer', 'Promoted from Administrative Aide', 'Oversees treasury operations, municipal revenue collection, and financial management.', 'Consistently rated "Excellent" in financial audits', 'CPA Certification, Treasury Management Training', 'Appointed by Mayor, renewable 6-year term', 'Key finance official', '2025-09-09 02:00:16', '2026-02-23 05:30:00'),
+(2, 2, 'Municipal Engineer', 'Grade 33', 7, 'Full-time', '2018-06-15', NULL, 'Active', NULL, 'Engineering Building', 75000.00, 6000.00, 0.00, 0.00, '2018-06-15', 20000.00, 36.36, 55000.00, 2, 1, 'Promotion', 'Appointed as Municipal Engineer', 'Promoted from CAD Operator', 'Supervises infrastructure projects, designs municipal roads and buildings.', 'Rated "Very Satisfactory" in infrastructure project completion', 'PRC Civil Engineer License, Project Management Certification', 'Appointed by Mayor, renewable 6-year term', 'Head of engineering department', '2025-09-09 02:00:16', '2026-02-23 05:30:00'),
+(3, 3, 'Nurse', 'Grade 16', 9, 'Full-time', '2020-01-20', NULL, 'Active', 10, 'Municipal Health Office', 42000.00, 3000.00, 0.00, 0.00, '2020-01-20', 0.00, 0.00, 42000.00, 1, 1, 'Initial Hire', 'Hired as Nurse', NULL, 'Provides nursing care, assists doctors, administers vaccinations.', 'Highly commended during pandemic response', 'PRC Nursing License, Basic Life Support Training', 'Contract renewable every 3 years', 'Dedicated health staff', '2025-09-09 02:00:16', '2025-09-09 02:00:16'),
+(4, 4, 'CAD Operator', 'Grade 14', 7, 'Full-time', '2019-03-10', NULL, 'Active', 2, 'Municipal Engineer\'s Office', 38000.00, 2000.00, 0.00, 0.00, '2019-03-10', 0.00, 0.00, 38000.00, 1, 1, 'Initial Hire', 'Hired as CAD Operator', NULL, 'Prepares AutoCAD drawings and engineering plans.', 'Satisfactory performance in multiple LGU projects', 'AutoCAD Certification', 'Fixed-term renewable contract', 'Key engineering support', '2025-09-09 02:00:16', '2025-09-09 02:00:16'),
+(5, 5, 'Social Worker', 'Grade 17', 10, 'Full-time', '2021-09-05', NULL, 'Active', NULL, 'Municipal Social Welfare & Development Office', 45000.00, 3000.00, 0.00, 0.00, '2021-09-05', 10000.00, 28.57, 35000.00, 2, 1, 'Promotion', 'Hired as Social Worker', 'Promoted from Administrative Aide', 'Handles casework, provides assistance to indigent families.', 'Rated "Very Good" in community outreach', 'Social Work License, Community Development Training', 'Regular plantilla position', 'Handles social services cases', '2025-09-09 02:00:16', '2026-02-23 05:30:00'),
+(6, 6, 'Accounting Staff', 'Grade 12', 5, 'Full-time', '2020-11-12', NULL, 'Active', NULL, 'Municipal Accountant\'s Office', 28000.00, 1500.00, 0.00, 0.00, '2020-11-12', 0.00, 0.00, 28000.00, 1, 1, 'Initial Hire', 'Hired as Accounting Staff', NULL, 'Processes vouchers, prepares reports, assists in bookkeeping.', 'Satisfactory audit reviews', 'Bookkeeping Certification', 'Regular plantilla position', 'Junior accounting role', '2025-09-09 02:00:16', '2025-09-09 02:00:16'),
+(7, 7, 'Clerk', 'Grade 10', 8, 'Full-time', '2022-02-28', NULL, 'Active', NULL, 'Municipal Civil Registrar\'s Office', 30000.00, 1000.00, 0.00, 0.00, '2022-02-28', 0.00, 0.00, 30000.00, 1, 1, 'Initial Hire', 'Hired as Clerk', NULL, 'Maintains registry records, assists clients with civil documents.', 'Rated "Good" by supervisor', 'Civil Registration Training', 'Contract renewable every 2 years', 'Support staff', '2025-09-09 02:00:16', '2025-09-09 02:00:16'),
+(8, 8, 'Maintenance Worker', 'Grade 11', 15, 'Full-time', '2021-05-18', NULL, 'Active', NULL, 'General Services Office', 22000.00, 1000.00, 0.00, 0.00, '2021-05-18', 0.00, 0.00, 22000.00, 1, 1, 'Initial Hire', 'Hired as Maintenance Worker', NULL, 'Performs facility maintenance and minor repairs.', 'Satisfactory in safety inspections', 'Electrical Safety Training', 'Casual employment converted to regular', 'Assigned to city hall facilities', '2025-09-09 02:00:16', '2025-09-09 02:00:16'),
+(9, 9, 'Cashier', 'Grade 13', 3, 'Full-time', '2020-09-10', NULL, 'Active', 1, 'Municipal Treasurer\'s Office', 32000.00, 2000.00, 0.00, 0.00, '2020-09-10', 8000.00, 33.33, 24000.00, 2, 1, 'Promotion', 'Hired as Cashier', 'Promoted from Clerk', 'Handles cash collection, prepares daily receipts.', 'Commended for accurate handling of cash', 'Financial Management Training', 'Regular plantilla position', 'Treasury office staff', '2025-09-09 02:00:16', '2026-02-23 05:30:00'),
+(10, 10, 'Collection Officer', 'Grade 15', 3, 'Full-time', '2019-12-01', NULL, 'Active', 1, 'Municipal Treasurer\'s Office', 35000.00, 2000.00, 0.00, 0.00, '2019-12-01', 10000.00, 40.00, 25000.00, 2, 1, 'Promotion', 'Hired as Collection Officer', 'Promoted from Clerk', 'Collects taxes and fees, manages accounts receivables.', 'Rated "Very Good" in collection efficiency', 'Revenue Collection Procedures Training', 'Regular plantilla position', 'Handles revenue collection', '2025-09-09 02:00:16', '2026-02-23 05:30:00'),
+(11, 1, 'Administrative Aide', 'Grade 8', 13, 'Full-time', '2017-03-01', '2019-06-30', 'Promoted', NULL, 'City Hall - 2nd Floor', 25000.00, 1000.00, 0.00, 0.00, '2017-03-01', 0.00, 0.00, NULL, 1, 0, 'Initial Hire', 'Started as Administrative Aide', 'Later promoted to Treasurer', 'Clerical and administrative support tasks.', 'Rated "Good"', NULL, 'Fixed-term appointment', 'Entry-level HR support', '2025-09-09 02:00:16', '2026-02-23 05:30:00'),
+(12, 2, 'CAD Operator', 'Grade 14', 7, 'Full-time', '2015-08-01', '2018-06-14', 'Promoted', NULL, 'Engineering Building', 32000.00, 1500.00, 0.00, 0.00, '2015-08-01', 0.00, 0.00, NULL, 1, 0, 'Initial Hire', 'Started as CAD Operator', 'Later promoted to Municipal Engineer', 'Drafting technical drawings.', 'Rated "Good"', 'AutoCAD Certification', 'Contract ended due to promotion', 'Junior engineering support', '2025-09-09 02:00:16', '2026-02-23 05:30:00'),
+(13, 5, 'Administrative Aide', 'Grade 8', 13, 'Full-time', '2019-01-15', '2021-09-04', 'Promoted', NULL, 'City Hall - 2nd Floor', 25000.00, 1000.00, 0.00, 0.00, '2019-01-15', 0.00, 0.00, NULL, 1, 0, 'Initial Hire', 'Started as Administrative Aide', 'Later promoted to Social Worker', 'Handled clerical support for social welfare programs.', 'Rated "Good"', NULL, 'Casual contract converted to plantilla', 'Support role before promotion', '2025-09-09 02:00:16', '2026-02-23 05:30:00'),
+(14, 9, 'Clerk', 'Grade 9', 8, 'Full-time', '2018-05-01', '2020-09-09', 'Promoted', NULL, 'Municipal Civil Registrar\'s Office', 22000.00, 500.00, 0.00, 0.00, '2018-05-01', 0.00, 0.00, NULL, 1, 0, 'Initial Hire', 'Started as Clerk', 'Later promoted to Cashier', 'Maintained registry documents, clerical tasks.', 'Rated "Good"', NULL, 'Contract ended due to transfer', 'Civil registrar support', '2025-09-09 02:00:16', '2026-02-23 05:30:00'),
+(15, 10, 'Clerk', 'Grade 9', 8, 'Full-time', '2017-10-01', '2019-11-30', 'Promoted', NULL, 'Municipal Civil Registrar\'s Office', 20000.00, 500.00, 0.00, 0.00, '2017-10-01', 0.00, 0.00, NULL, 1, 0, 'Initial Hire', 'Started as Clerk', 'Later promoted to Collection Officer', 'Clerical tasks, processing records.', 'Rated "Satisfactory"', NULL, 'Contract ended due to promotion', 'Civil registrar support role', '2025-09-09 02:00:16', '2026-02-23 05:30:00');
 
-INSERT INTO `employment_history` (`history_id`, `employee_id`, `job_title`, `department_id`, `employment_type`, `start_date`, `end_date`, `employment_status`, `reporting_manager_id`, `location`, `base_salary`, `allowances`, `bonuses`, `salary_adjustments`, `reason_for_change`, `promotions_transfers`, `duties_responsibilities`, `performance_evaluations`, `training_certifications`, `contract_details`, `remarks`, `created_at`, `updated_at`) VALUES
-(1, 1, 'Municipal Treasurer', 3, 'Full-time', '2019-07-01', NULL, 'Active', NULL, 'City Hall - 1st Floor', 65000.00, 5000.00, 0.00, 0.00, 'Appointed as Municipal Treasurer', 'Promoted from Administrative Aide', 'Oversees treasury operations, municipal revenue collection, and financial management.', 'Consistently rated \"Excellent\" in financial audits', 'CPA Certification, Treasury Management Training', 'Appointed by Mayor, renewable 6-year term', 'Key finance official', '2025-09-09 02:00:16', '2025-09-09 02:00:16'),
-(2, 2, 'Municipal Engineer', 7, 'Full-time', '2018-06-15', NULL, 'Active', NULL, 'Engineering Building', 75000.00, 6000.00, 0.00, 0.00, 'Appointed as Municipal Engineer', 'Promoted from CAD Operator', 'Supervises infrastructure projects, designs municipal roads and buildings.', 'Rated \"Very Satisfactory\" in infrastructure project completion', 'PRC Civil Engineer License, Project Management Certification', 'Appointed by Mayor, renewable 6-year term', 'Head of engineering department', '2025-09-09 02:00:16', '2025-09-09 02:00:16'),
-(3, 3, 'Nurse', 9, 'Full-time', '2020-01-20', NULL, 'Active', 10, 'Municipal Health Office', 42000.00, 3000.00, 0.00, 0.00, 'Hired as Nurse', NULL, 'Provides nursing care, assists doctors, administers vaccinations.', 'Highly commended during pandemic response', 'PRC Nursing License, Basic Life Support Training', 'Contract renewable every 3 years', 'Dedicated health staff', '2025-09-09 02:00:16', '2025-09-09 02:00:16'),
-(4, 4, 'CAD Operator', 7, 'Full-time', '2019-03-10', NULL, 'Active', 2, 'Municipal Engineer\'s Office', 38000.00, 2000.00, 0.00, 0.00, 'Hired as CAD Operator', NULL, 'Prepares AutoCAD drawings and engineering plans.', 'Satisfactory performance in multiple LGU projects', 'AutoCAD Certification', 'Fixed-term renewable contract', 'Key engineering support', '2025-09-09 02:00:16', '2025-09-09 02:00:16'),
-(5, 5, 'Social Worker', 10, 'Full-time', '2021-09-05', NULL, 'Active', NULL, 'Municipal Social Welfare & Development Office', 45000.00, 3000.00, 0.00, 0.00, 'Hired as Social Worker', 'Promoted from Administrative Aide', 'Handles casework, provides assistance to indigent families.', 'Rated \"Very Good\" in community outreach', 'Social Work License, Community Development Training', 'Regular plantilla position', 'Handles social services cases', '2025-09-09 02:00:16', '2025-09-09 02:00:16'),
-(6, 6, 'Accounting Staff', 5, 'Full-time', '2020-11-12', NULL, 'Active', NULL, 'Municipal Accountant\'s Office', 28000.00, 1500.00, 0.00, 0.00, 'Hired as Accounting Staff', NULL, 'Processes vouchers, prepares reports, assists in bookkeeping.', 'Satisfactory audit reviews', 'Bookkeeping Certification', 'Regular plantilla position', 'Junior accounting role', '2025-09-09 02:00:16', '2025-09-09 02:00:16'),
-(7, 7, 'Clerk', 8, 'Full-time', '2022-02-28', NULL, 'Active', NULL, 'Municipal Civil Registrar\'s Office', 30000.00, 1000.00, 0.00, 0.00, 'Hired as Clerk', NULL, 'Maintains registry records, assists clients with civil documents.', 'Rated \"Good\" by supervisor', 'Civil Registration Training', 'Contract renewable every 2 years', 'Support staff', '2025-09-09 02:00:16', '2025-09-09 02:00:16'),
-(8, 8, 'Maintenance Worker', 15, 'Full-time', '2021-05-18', NULL, 'Active', NULL, 'General Services Office', 22000.00, 1000.00, 0.00, 0.00, 'Hired as Maintenance Worker', NULL, 'Performs facility maintenance and minor repairs.', 'Satisfactory in safety inspections', 'Electrical Safety Training', 'Casual employment converted to regular', 'Assigned to city hall facilities', '2025-09-09 02:00:16', '2025-09-09 02:00:16'),
-(9, 9, 'Cashier', 3, 'Full-time', '2020-09-10', NULL, 'Active', 1, 'Municipal Treasurer\'s Office', 32000.00, 2000.00, 0.00, 0.00, 'Hired as Cashier', 'Promoted from Clerk', 'Handles cash collection, prepares daily receipts.', 'Commended for accurate handling of cash', 'Financial Management Training', 'Regular plantilla position', 'Treasury office staff', '2025-09-09 02:00:16', '2025-09-09 02:00:16'),
-(10, 10, 'Collection Officer', 3, 'Full-time', '2019-12-01', NULL, 'Active', 1, 'Municipal Treasurer\'s Office', 35000.00, 2000.00, 0.00, 0.00, 'Hired as Collection Officer', 'Promoted from Clerk', 'Collects taxes and fees, manages accounts receivables.', 'Rated \"Very Good\" in collection efficiency', 'Revenue Collection Procedures Training', 'Regular plantilla position', 'Handles revenue collection', '2025-09-09 02:00:16', '2025-09-09 02:00:16'),
-(11, 1, 'Administrative Aide', 13, 'Full-time', '2017-03-01', '2019-06-30', 'Resigned', NULL, 'City Hall - 2nd Floor', 25000.00, 1000.00, 0.00, 0.00, 'Started as Administrative Aide', 'Later promoted to Treasurer', 'Clerical and administrative support tasks.', 'Rated \"Good\"', NULL, 'Fixed-term appointment', 'Entry-level HR support', '2025-09-09 02:00:16', '2025-09-09 02:00:16'),
-(12, 2, 'CAD Operator', 7, 'Full-time', '2015-08-01', '2018-06-14', 'Transferred', NULL, 'Engineering Building', 32000.00, 1500.00, 0.00, 0.00, 'Started as CAD Operator', 'Later promoted to Municipal Engineer', 'Drafting technical drawings.', 'Rated \"Good\"', 'AutoCAD Certification', 'Contract ended due to promotion', 'Junior engineering support', '2025-09-09 02:00:16', '2025-09-09 02:00:16'),
-(13, 5, 'Administrative Aide', 13, 'Full-time', '2019-01-15', '2021-09-04', 'Transferred', NULL, 'City Hall - 2nd Floor', 25000.00, 1000.00, 0.00, 0.00, 'Started as Administrative Aide', 'Later promoted to Social Worker', 'Handled clerical support for social welfare programs.', 'Rated \"Good\"', NULL, 'Casual contract converted to plantilla', 'Support role before promotion', '2025-09-09 02:00:16', '2025-09-09 02:00:16'),
-(14, 9, 'Clerk', 8, 'Full-time', '2018-05-01', '2020-09-09', 'Transferred', NULL, 'Municipal Civil Registrar\'s Office', 22000.00, 500.00, 0.00, 0.00, 'Started as Clerk', 'Later promoted to Cashier', 'Maintained registry documents, clerical tasks.', 'Rated \"Good\"', NULL, 'Contract ended due to transfer', 'Civil registrar support', '2025-09-09 02:00:16', '2025-09-09 02:00:16'),
-(15, 10, 'Clerk', 8, 'Full-time', '2017-10-01', '2019-11-30', 'Transferred', NULL, 'Municipal Civil Registrar\'s Office', 20000.00, 500.00, 0.00, 0.00, 'Started as Clerk', 'Later promoted to Collection Officer', 'Clerical tasks, processing records.', 'Rated \"Satisfactory\"', NULL, 'Contract ended due to promotion', 'Civil registrar support role', '2025-09-09 02:00:16', '2025-09-09 02:00:16');
+
+-- ============================================================
+-- NEW TABLE: external_employment_history
+-- Tracks work experience OUTSIDE the current organization
+-- ============================================================
+
+CREATE TABLE `external_employment_history` (
+  `ext_history_id` int(11) NOT NULL AUTO_INCREMENT,
+  `employee_id` int(11) NOT NULL,
+  `employer_name` varchar(200) NOT NULL COMMENT 'Name of previous employer or organization',
+  `employer_type` enum('Government','Private','NGO/Non-Profit','Self-Employed/Freelance','International Organization','Academic Institution','Military/Uniformed Service') NOT NULL,
+  `employer_address` varchar(300) DEFAULT NULL,
+  `job_title` varchar(150) NOT NULL,
+  `department_or_division` varchar(150) DEFAULT NULL,
+  `employment_type` enum('Full-time','Part-time','Contractual','Project-based','Casual','Intern','Volunteer','Consultant') NOT NULL,
+  `start_date` date NOT NULL,
+  `end_date` date DEFAULT NULL COMMENT 'NULL if currently employed there',
+  `is_current` tinyint(1) DEFAULT 0,
+  `years_of_experience` decimal(4,1) DEFAULT NULL COMMENT 'Auto-computed or manually entered years in this role',
+  `monthly_salary` decimal(10,2) DEFAULT NULL,
+  `currency` varchar(10) DEFAULT 'PHP',
+  `reason_for_leaving` enum('Resigned','End of Contract','Terminated','Promoted','Transferred','Retired','Business Closure','Personal Reasons','Better Opportunity','Migration','Other') DEFAULT NULL,
+  `key_responsibilities` text DEFAULT NULL,
+  `achievements` text DEFAULT NULL,
+  `immediate_supervisor` varchar(150) DEFAULT NULL,
+  `supervisor_contact` varchar(100) DEFAULT NULL COMMENT 'Phone or email of supervisor for reference',
+  `reference_available` tinyint(1) DEFAULT 1 COMMENT '1 = yes, 0 = no',
+  `skills_gained` text DEFAULT NULL COMMENT 'Comma-separated or narrative list of competencies gained',
+  `verified` tinyint(1) DEFAULT 0 COMMENT '1 = HR has verified this record',
+  `verification_date` date DEFAULT NULL,
+  `remarks` text DEFAULT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
+  PRIMARY KEY (`ext_history_id`),
+  KEY `fk_ext_emp` (`employee_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci
+COMMENT='Records of employee work experience outside the current organization';
+
+
+-- ============================================================
+-- NEW TABLE: employee_seminars_trainings
+-- Tracks external seminars, training programs, webinars, etc.
+-- ============================================================
+
+CREATE TABLE `employee_seminars_trainings` (
+  `seminar_id` int(11) NOT NULL AUTO_INCREMENT,
+  `employee_id` int(11) NOT NULL,
+  `title` varchar(255) NOT NULL COMMENT 'Title of the seminar, training, or workshop',
+  `category` enum(
+    'Technical/Skills Training',
+    'Leadership & Management',
+    'Legal & Compliance',
+    'Health & Safety',
+    'Financial Management',
+    'Information Technology',
+    'Customer Service',
+    'Communication & Soft Skills',
+    'Civil Service & Governance',
+    'Disaster Risk Reduction',
+    'Gender & Development',
+    'Ethics & Anti-Corruption',
+    'Environmental Management',
+    'Other'
+  ) NOT NULL,
+  `organizer` varchar(200) DEFAULT NULL COMMENT 'Organization or institution that hosted the event',
+  `venue` varchar(255) DEFAULT NULL,
+  `modality` enum('Face-to-Face','Online/Virtual','Blended','Self-paced') DEFAULT 'Face-to-Face',
+  `start_date` date NOT NULL,
+  `end_date` date DEFAULT NULL,
+  `duration_hours` decimal(6,1) DEFAULT NULL COMMENT 'Total number of training hours',
+  `certificate_received` tinyint(1) DEFAULT 0,
+  `certificate_number` varchar(100) DEFAULT NULL,
+  `certificate_expiry` date DEFAULT NULL COMMENT 'For certifications with validity periods',
+  `funded_by` enum('Employee','LGU Budget','Scholarship/Grant','CSC','DILG','DOH','DepEd','Other Agency') DEFAULT 'LGU Budget',
+  `amount_spent` decimal(10,2) DEFAULT 0.00 COMMENT 'Training cost or registration fee',
+  `learning_outcomes` text DEFAULT NULL COMMENT 'Skills, knowledge, or competencies gained',
+  `remarks` text DEFAULT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
+  PRIMARY KEY (`seminar_id`),
+  KEY `fk_seminar_emp` (`employee_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci
+COMMENT='Seminars, trainings, workshops, and webinars attended by employees';
+
+
+-- ============================================================
+-- NEW TABLE: employee_licenses_certifications
+-- Tracks professional licenses, board exams, certifications
+-- ============================================================
+
+CREATE TABLE `employee_licenses_certifications` (
+  `license_id` int(11) NOT NULL AUTO_INCREMENT,
+  `employee_id` int(11) NOT NULL,
+  `license_name` varchar(200) NOT NULL,
+  `license_type` enum('Professional License','Board Exam Passer','Civil Service Eligibility','Government Certification','Industry Certification','Academic Credential','Other') NOT NULL,
+  `issuing_body` varchar(200) DEFAULT NULL COMMENT 'E.g., PRC, CSC, TESDA, CHED, industry bodies',
+  `license_number` varchar(100) DEFAULT NULL,
+  `date_issued` date DEFAULT NULL,
+  `date_of_exam` date DEFAULT NULL,
+  `expiry_date` date DEFAULT NULL COMMENT 'NULL if lifetime/no expiry',
+  `rating` decimal(5,2) DEFAULT NULL COMMENT 'Exam rating if applicable',
+  `status` enum('Active','Expired','Suspended','Revoked','Pending Renewal') DEFAULT 'Active',
+  `renewal_date` date DEFAULT NULL,
+  `remarks` text DEFAULT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
+  PRIMARY KEY (`license_id`),
+  KEY `fk_license_emp` (`employee_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci
+COMMENT='Professional licenses, board exam results, and certifications of employees';
+
+
+-- ============================================================
+-- NEW TABLE: employee_awards_recognition
+-- Tracks awards, commendations, and recognition received
+-- ============================================================
+
+CREATE TABLE `employee_awards_recognition` (
+  `award_id` int(11) NOT NULL AUTO_INCREMENT,
+  `employee_id` int(11) NOT NULL,
+  `award_title` varchar(255) NOT NULL,
+  `award_type` enum('Internal Award','External Award','Presidential/National','Regional','Provincial','Municipal/City','Academic','Community') NOT NULL,
+  `awarding_body` varchar(200) DEFAULT NULL,
+  `date_received` date DEFAULT NULL,
+  `description` text DEFAULT NULL,
+  `remarks` text DEFAULT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
+  PRIMARY KEY (`award_id`),
+  KEY `fk_award_emp` (`employee_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci
+COMMENT='Awards, commendations, and recognitions received by employees';
+
+
+-- ============================================================
+-- NEW TABLE: employee_voluntary_work
+-- Community involvement, volunteer experience
+-- ============================================================
+
+CREATE TABLE `employee_voluntary_work` (
+  `voluntary_id` int(11) NOT NULL AUTO_INCREMENT,
+  `employee_id` int(11) NOT NULL,
+  `organization` varchar(200) NOT NULL,
+  `position_nature_of_work` varchar(255) DEFAULT NULL,
+  `start_date` date DEFAULT NULL,
+  `end_date` date DEFAULT NULL,
+  `hours_per_week` int(11) DEFAULT NULL,
+  `description` text DEFAULT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
+  PRIMARY KEY (`voluntary_id`),
+  KEY `fk_vol_emp` (`employee_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci
+COMMENT='Voluntary or community work records of employees';
+
+
+-- ============================================================
+-- SAMPLE DATA: external_employment_history
+-- ============================================================
+
+INSERT INTO `external_employment_history` (
+  `employee_id`, `employer_name`, `employer_type`, `employer_address`, `job_title`,
+  `department_or_division`, `employment_type`, `start_date`, `end_date`, `is_current`,
+  `years_of_experience`, `monthly_salary`, `currency`, `reason_for_leaving`,
+  `key_responsibilities`, `achievements`, `immediate_supervisor`, `supervisor_contact`,
+  `reference_available`, `skills_gained`, `verified`, `verification_date`, `remarks`
+) VALUES
+
+-- Employee 1: Municipal Treasurer — prior work in private banking and BIR
+(1, 'BDO Unibank, Inc.', 'Private', 'Makati City, Metro Manila', 'Bank Teller',
+ 'Branch Operations', 'Full-time', '2011-06-01', '2014-07-31', 0,
+ 3.2, 18000.00, 'PHP', 'Better Opportunity',
+ 'Processed daily cash transactions, reconciled till, handled client inquiries.',
+ 'Consistent zero-variance cash handling for 24 consecutive months.',
+ 'Branch Manager Santos', 'santos.bdo@example.com',
+ 1, 'Cash management, financial reconciliation, customer service', 1, '2017-04-01',
+ 'Left to pursue government career'),
+
+(1, 'Bureau of Internal Revenue - Region 8', 'Government', 'Tacloban City, Leyte', 'Revenue Officer I',
+ 'Collection Division', 'Full-time', '2014-09-01', '2017-02-28', 0,
+ 2.5, 28000.00, 'PHP', 'Transferred',
+ 'Conducted tax assessments, issued notices of delinquency, filed enforcement actions.',
+ 'Exceeded collection targets by 18% in FY 2016.',
+ 'Asst. Regional Director Cruz', 'cruz.bir@example.com',
+ 1, 'Tax law, collection enforcement, government accounting', 1, '2017-04-01',
+ 'Transferred to LGU to be closer to family'),
+
+-- Employee 2: Municipal Engineer — prior work in private construction firm
+(2, 'DMCI Project Developers, Inc.', 'Private', 'Mandaluyong City, Metro Manila', 'Junior Civil Engineer',
+ 'Construction Management', 'Full-time', '2010-03-01', '2013-05-31', 0,
+ 3.3, 22000.00, 'PHP', 'Personal Reasons',
+ 'Supervised residential high-rise construction; prepared engineering estimates and progress reports.',
+ 'Completed Phase 1 of Torre de Manila ahead of schedule by 2 months.',
+ 'Engr. Reyes', 'reyes.dmci@example.com',
+ 1, 'Construction management, structural design, project estimation', 1, '2016-01-10',
+ 'Returned to province to serve local community'),
+
+(2, 'Department of Public Works and Highways - Region 8', 'Government', 'Tacloban City, Leyte', 'Civil Engineer II',
+ 'Planning & Design Division', 'Full-time', '2013-07-01', '2015-07-31', 0,
+ 2.1, 35000.00, 'PHP', 'Better Opportunity',
+ 'Designed road alignments, reviewed drainage plans, prepared project feasibility studies.',
+ 'Led design of 12 km farm-to-market road funded under DPWH-GAA 2014.',
+ 'District Engineer Lim', 'lim.dpwh@example.com',
+ 1, 'Structural design, feasibility studies, government infrastructure planning', 1, '2016-01-10',
+ 'Joined LGU for broader leadership role'),
+
+-- Employee 3: Nurse — prior hospital work
+(3, 'Eastern Visayas Regional Medical Center', 'Government', 'Tacloban City, Leyte', 'Staff Nurse',
+ 'Medical-Surgical Ward', 'Full-time', '2016-03-01', '2018-12-31', 0,
+ 2.8, 20000.00, 'PHP', 'Personal Reasons',
+ 'Provided bedside nursing care, administered medications, monitored patient vitals.',
+ 'Recognized as Best Nurse of the Quarter - Q3 2017.',
+ 'Head Nurse Soriano', 'soriano.evrmc@example.com',
+ 1, 'Patient care, medication administration, emergency triage', 1, '2020-02-15',
+ 'Transferred to community health setting'),
+
+(3, 'Doctors Without Borders (MSF) — Philippines', 'NGO/Non-Profit', 'Marawi City, Lanao del Sur', 'Field Nurse',
+ 'Emergency Medical Team', 'Contractual', '2019-01-15', '2019-10-31', 0,
+ 0.8, 35000.00, 'PHP', 'End of Contract',
+ 'Delivered emergency healthcare to displaced populations during Marawi rehabilitation; conducted health screenings.',
+ 'Administered care to over 1,200 displaced persons during assignment.',
+ 'Field Coordinator Alvarez', 'alvarez.msf@example.com',
+ 1, 'Humanitarian healthcare, triage, public health field operations', 1, '2020-02-15',
+ 'Short-term humanitarian assignment'),
+
+-- Employee 4: CAD Operator — prior drafting work
+(4, 'Palafox Associates', 'Private', 'Quezon City, Metro Manila', 'Architectural Draftsman',
+ 'Design Studio', 'Full-time', '2015-06-01', '2017-09-30', 0,
+ 2.3, 17500.00, 'PHP', 'Personal Reasons',
+ 'Produced 2D and 3D AutoCAD drawings for commercial and residential projects.',
+ 'Contributed to award-winning commercial complex design in Cebu City (2016).',
+ 'Senior Architect Gutierrez', 'gutierrez.palafox@example.com',
+ 1, 'AutoCAD, 3D modeling, architectural drafting, blueprint reading', 1, '2019-04-01',
+ 'Returned to province to be near family'),
+
+(4, 'LGU Baybay City Engineering Office', 'Government', 'Baybay City, Leyte', 'CAD Draftsman (Contractual)',
+ 'Infrastructure Division', 'Contractual', '2017-11-01', '2019-02-28', 0,
+ 1.3, 15000.00, 'PHP', 'End of Contract',
+ 'Prepared plans for school buildings, evacuation centers, and barangay halls under local fund projects.',
+ 'Completed CAD output for 8 BDRRMC evacuation centers within 3-month deadline.',
+ 'City Engineer Manalo', 'manalo.baybay@example.com',
+ 1, 'Government drafting, engineering plan preparation, infrastructure documentation', 1, '2019-04-01',
+ 'Contract ended; transitioned to current LGU position'),
+
+-- Employee 5: Social Worker — prior NGO and DSWD work
+(5, 'Gawad Kalinga Community Development Foundation', 'NGO/Non-Profit', 'Pasig City, Metro Manila', 'Community Development Officer',
+ 'Livelihood Programs', 'Full-time', '2016-06-01', '2018-01-31', 0,
+ 1.7, 19000.00, 'PHP', 'Personal Reasons',
+ 'Conducted community needs assessments, organized livelihood seminars, managed beneficiary records.',
+ 'Organized 3 productive livelihood fairs reaching 500+ beneficiaries.',
+ 'Program Director Macaraeg', 'macaraeg.gk@example.com',
+ 1, 'Community organizing, case management, stakeholder coordination', 1, '2019-02-01',
+ 'Returned to home province'),
+
+(5, 'DSWD Field Office VIII', 'Government', 'Tacloban City, Leyte', 'Social Welfare Assistant',
+ 'Pantawid Pamilyang Pilipino Program', 'Contractual', '2018-03-01', '2019-01-14', 0,
+ 0.9, 16000.00, 'PHP', 'End of Contract',
+ 'Conducted home visits, validated 4Ps beneficiaries, encoded case data into DSWD system.',
+ 'Validated and updated records of 430 4Ps families in assigned barangays.',
+ 'Municipal Link Flores', 'flores.dswd@example.com',
+ 1, 'Social case work, beneficiary validation, government social programs', 1, '2019-02-01',
+ 'Contract ended before transfer to current LGU role'),
+
+-- Employee 6: Accounting Staff — prior bookkeeping work
+(6, 'Leyte Integrated Cooperative', 'Private', 'Ormoc City, Leyte', 'Bookkeeper',
+ 'Finance Department', 'Full-time', '2017-05-01', '2019-09-30', 0,
+ 2.4, 14000.00, 'PHP', 'Better Opportunity',
+ 'Maintained general ledger, prepared financial statements, reconciled bank accounts.',
+ 'Helped reduce month-end closing time by 3 days through process improvements.',
+ 'Finance Manager Tabbal', 'tabbal.lic@example.com',
+ 1, 'Bookkeeping, financial statement preparation, bank reconciliation', 1, '2021-01-15',
+ 'Moved to government sector for job security'),
+
+(6, 'BIR-Revenue District Office 83', 'Government', 'Baybay City, Leyte', 'Job Order Accounting Aide',
+ 'Assessment Division', 'Contractual', '2019-10-01', '2020-10-31', 0,
+ 1.1, 11000.00, 'PHP', 'End of Contract',
+ 'Assisted in encoding tax returns, tracking TIN applications, and filing compliance documents.',
+ 'Maintained 99% accuracy in taxpayer encoding over 12-month period.',
+ 'Revenue Officer Sabalberino', 'sabalberino.bir@example.com',
+ 1, 'Tax compliance, data encoding, government accounting procedures', 1, '2021-01-15',
+ 'Job order contract ended; immediately hired by current LGU'),
+
+-- Employee 7: Clerk — fresh with minimal experience; part-time and volunteer
+(7, 'Samahang Kabataan ng Barangay Cogon', 'NGO/Non-Profit', 'Barangay Cogon, Leyte', 'Youth Secretary (Volunteer)',
+ 'SK Secretariat', 'Volunteer', '2019-06-01', '2021-12-31', 0,
+ 2.6, NULL, 'PHP', 'Personal Reasons',
+ 'Recorded minutes of meetings, maintained barangay youth files, coordinated community events.',
+ 'Organized annual youth leadership camp attended by 120 youth from 5 barangays.',
+ 'SK Chairperson Delgado', 'delgado.sk@example.com',
+ 1, 'Records management, event coordination, community service', 1, '2022-03-10',
+ 'Voluntary work; served as foundation for civil registrar career'),
+
+(7, 'Leyte Normal University', 'Academic Institution', 'Tacloban City, Leyte', 'Student Library Assistant (Part-time)',
+ 'Library Services', 'Part-time', '2018-06-01', '2019-05-31', 0,
+ 1.0, 5000.00, 'PHP', 'End of Contract',
+ 'Catalogued library materials, assisted students and faculty, maintained borrowing records.',
+ 'Digitized card catalog index of over 3,000 titles within one semester.',
+ 'Head Librarian Bacsal', 'bacsal.lnu@example.com',
+ 1, 'Records keeping, cataloguing, data encoding, customer assistance', 1, '2022-03-10',
+ 'Part-time student employment'),
+
+-- Employee 8: Maintenance Worker — prior private sector and construction labor
+(8, 'Jollibee Foods Corporation - Tacloban Franchise', 'Private', 'Tacloban City, Leyte', 'Utility/Maintenance Staff',
+ 'Operations', 'Full-time', '2014-03-01', '2016-11-30', 0,
+ 2.8, 11000.00, 'PHP', 'Personal Reasons',
+ 'Maintained cleanliness of restaurant, performed basic electrical and plumbing repairs, assisted in equipment upkeep.',
+ 'Awarded Employee of the Month - May 2015 for exemplary maintenance performance.',
+ 'Store Manager Chua', 'chua.jfc@example.com',
+ 1, 'Electrical maintenance, plumbing, sanitation, equipment servicing', 1, '2021-06-01',
+ 'Resigned to pursue work closer to home municipality'),
+
+(8, 'Montinola Construction Supply & Services', 'Private', 'Palo, Leyte', 'Construction Laborer / Leadman',
+ 'Field Operations', 'Project-based', '2017-01-01', '2021-04-30', 0,
+ 4.3, 12000.00, 'PHP', 'Better Opportunity',
+ 'Led team of 5 laborers in building construction; managed daily material requisitions and site safety.',
+ 'Led completion of 3 school buildings funded under DepEd BDCP without safety incidents.',
+ 'Foreman Magbanua', 'magbanua.mcs@example.com',
+ 1, 'Construction supervision, materials management, team leadership, occupational safety', 1, '2021-06-01',
+ 'Project contract ended; hired by LGU as maintenance worker'),
+
+-- Employee 9: Cashier — prior retail and banking cashier work
+(9, 'SM Savemore Market - Tacloban', 'Private', 'Tacloban City, Leyte', 'Cashier',
+ 'Retail Operations', 'Full-time', '2014-07-01', '2016-06-30', 0,
+ 2.0, 12000.00, 'PHP', 'Better Opportunity',
+ 'Processed point-of-sale transactions, managed cash register, handled customer concerns.',
+ 'Achieved zero cash shortage record for full 2-year tenure.',
+ 'Store Supervisor Bongon', 'bongon.sm@example.com',
+ 1, 'Cash handling, POS system operation, customer service, financial accountability', 1, '2018-06-01',
+ 'Left retail for public sector cashiering role'),
+
+(9, 'Leyte Cooperative Bank', 'Private', 'Palo, Leyte', 'Bank Teller',
+ 'Branch Operations', 'Full-time', '2016-08-01', '2018-04-30', 0,
+ 1.8, 16000.00, 'PHP', 'Better Opportunity',
+ 'Processed deposits, withdrawals, and loan releases; balanced daily cash position.',
+ 'Commended for assisting in system migration to digital banking platform.',
+ 'Branch Head Sabio', 'sabio.lcb@example.com',
+ 1, 'Banking operations, cash balancing, financial transactions, cooperative principles', 1, '2018-06-01',
+ 'Transferred to government for career advancement'),
+
+-- Employee 10: Collection Officer — prior private collections and LGU work
+(10, 'Pag-IBIG Fund (HDMF) - Tacloban Branch', 'Government', 'Tacloban City, Leyte', 'Collection Specialist (Contractual)',
+ 'Loans & Collections Division', 'Contractual', '2014-02-01', '2016-09-30', 0,
+ 2.7, 17000.00, 'PHP', 'End of Contract',
+ 'Processed housing loan payments, issued SOAs, followed up delinquent accounts.',
+ 'Reduced delinquency rate in assigned portfolio by 22% within 6 months.',
+ 'Division Head Delos Santos', 'delossantos.hdmf@example.com',
+ 1, 'Collections management, account monitoring, credit analysis, loan processing', 1, '2019-12-15',
+ 'Contract ended; moved to LGU for permanent plantilla position'),
+
+(10, 'Provincial Government of Leyte - Treasurer\'s Office', 'Government', 'Tacloban City, Leyte', 'Revenue Collection Clerk',
+ 'Revenue Collection Division', 'Casual', '2016-11-01', '2017-09-30', 0,
+ 0.9, 14000.00, 'PHP', 'Better Opportunity',
+ 'Collected real property taxes, issued official receipts, updated taxpayer ledgers.',
+ 'Pioneered use of simplified collection summary form adopted province-wide.',
+ 'Provincial Treasurer Obediencia', 'obediencia.pgt@example.com',
+ 1, 'Real property tax collection, official receipt management, taxpayer relations', 1, '2019-12-15',
+ 'Left provincial government for municipal position');
+
+
+-- ============================================================
+-- SAMPLE DATA: employee_seminars_trainings
+-- ============================================================
+
+INSERT INTO `employee_seminars_trainings` (
+  `employee_id`, `title`, `category`, `organizer`, `venue`, `modality`,
+  `start_date`, `end_date`, `duration_hours`, `certificate_received`,
+  `certificate_number`, `certificate_expiry`, `funded_by`, `amount_spent`,
+  `learning_outcomes`, `remarks`
+) VALUES
+
+-- Employee 1 (Treasurer)
+(1, 'New Government Accounting System (NGAS) for LGUs', 'Financial Management', 'Commission on Audit (COA)', 'COA Regional Office, Tacloban City', 'Face-to-Face', '2020-03-02', '2020-03-06', 40.0, 1, 'COA-2020-NGAS-0412', NULL, 'LGU Budget', 5000.00, 'Revised chart of accounts, journal entries, financial reporting under NGAS', 'Mandatory for all treasury officials'),
+(1, 'Anti-Money Laundering Act (AMLA) Updates for LGUs', 'Legal & Compliance', 'AMLC Secretariat', 'Online via Zoom', 'Online/Virtual', '2022-07-14', '2022-07-14', 8.0, 1, 'AMLC-2022-007', NULL, 'LGU Budget', 0.00, 'LGU obligations under AMLA, reporting suspicious transactions, beneficial ownership', 'Mandatory for treasure officers'),
+(1, 'Real Property Tax Administration Seminar', 'Financial Management', 'Bureau of Local Government Finance (BLGF)', 'BLGF Central Office, Quezon City', 'Face-to-Face', '2023-05-15', '2023-05-19', 40.0, 1, 'BLGF-RPT-2023-089', NULL, 'LGU Budget', 8000.00, 'RPT assessment, collection procedures, exemptions, disposition', 'Part of BLGF LGU Finance Officers training series'),
+(1, 'Gender and Development (GAD) Planning and Budgeting', 'Gender & Development', 'NCRFW / PCW', 'Cebu City', 'Face-to-Face', '2024-02-07', '2024-02-09', 24.0, 1, 'PCW-GAD-2024-034', NULL, 'LGU Budget', 4500.00, 'GAD budget attribution, GPB preparation, HGDG tool', 'Required for all department heads'),
+
+-- Employee 2 (Municipal Engineer)
+(2, 'Project Management for Infrastructure Projects', 'Leadership & Management', 'Project Management Institute Philippines', 'Cebu City', 'Face-to-Face', '2019-08-05', '2019-08-09', 40.0, 1, 'PMI-PH-2019-112', NULL, 'LGU Budget', 12000.00, 'Project lifecycle management, risk assessment, stakeholder management, Gantt charting', 'Sponsored by LGU for department head development'),
+(2, 'National Building Code of the Philippines – Implementing Rules and Regulations', 'Legal & Compliance', 'DPWH Bureau of Construction', 'Manila', 'Face-to-Face', '2021-03-22', '2021-03-26', 40.0, 1, 'DPWH-NBC-2021-045', NULL, 'LGU Budget', 7500.00, 'Updated IRC provisions, accessibilities standards, structural requirements', 'Mandatory for licensed engineers in government'),
+(2, 'Disaster-Resilient Infrastructure Design', 'Disaster Risk Reduction', 'OCD Region 8', 'Tacloban City', 'Face-to-Face', '2022-10-03', '2022-10-05', 24.0, 1, 'OCD-DRI-2022-028', NULL, 'LGU Budget', 2000.00, 'Typhoon-resilient structural design, flood-proofing, slope protection', 'Post-Typhoon Odette response capacity building'),
+(2, 'Public Procurement Law (RA 9184) for Engineers', 'Legal & Compliance', 'Government Procurement Policy Board (GPPB)', 'Online via MS Teams', 'Online/Virtual', '2023-11-20', '2023-11-22', 24.0, 1, 'GPPB-2023-ENG-061', NULL, 'LGU Budget', 0.00, 'PhilGEPS registration, BAC functions, technical specifications preparation', 'Mandatory for engineers involved in procurement'),
+
+-- Employee 3 (Nurse)
+(3, 'Basic Life Support (BLS) with AED Training', 'Health & Safety', 'Philippine Heart Association', 'Tacloban City', 'Face-to-Face', '2020-06-15', '2020-06-16', 16.0, 1, 'PHA-BLS-2020-203', '2022-06-15', 'LGU Budget', 3000.00, 'CPR techniques, AED use, choking management, BLS protocol updates', 'Certification renewed biennially'),
+(3, 'COVID-19 Case Management and IPC Protocol Training', 'Health & Safety', 'Department of Health Region 8', 'DOH-CHD VIII, Tacloban City', 'Face-to-Face', '2020-09-07', '2020-09-11', 40.0, 1, 'DOH-COVID-2020-IPC-019', NULL, 'DOH', 0.00, 'Standard precautions, PPE donning/doffing, isolation protocols, contact tracing', 'Emergency training during pandemic'),
+(3, 'Maternal and Child Health Nursing Update', 'Technical/Skills Training', 'Philippine Nurses Association', 'Cebu City', 'Face-to-Face', '2022-03-16', '2022-03-18', 24.0, 1, 'PNA-MCH-2022-087', NULL, 'LGU Budget', 5000.00, 'Antenatal care protocols, EINC, newborn screening, IMCI algorithm updates', 'CPE units credited for PRC renewal'),
+(3, 'Mental Health in Primary Care Settings', 'Health & Safety', 'National Center for Mental Health', 'Online via Zoom', 'Online/Virtual', '2023-08-23', '2023-08-25', 24.0, 1, 'NCMH-2023-MH-055', NULL, 'LGU Budget', 0.00, 'mhGAP protocols, suicide risk assessment basics, referral pathways', 'In response to post-disaster mental health concerns'),
+
+-- Employee 4 (CAD Operator)
+(4, 'AutoCAD Civil 3D Advanced Training', 'Technical/Skills Training', 'Autodesk Philippines Training Center', 'Cebu City', 'Face-to-Face', '2020-07-13', '2020-07-17', 40.0, 1, 'AUTODESK-C3D-2020-041', NULL, 'LGU Budget', 9500.00, 'Civil 3D surface modelling, grading, corridor design, drainage analysis', 'Sponsored by Engineering Dept for capability upgrade'),
+(4, 'GIS Mapping for LGUs using QGIS', 'Technical/Skills Training', 'NAMRIA / HLURB', 'Tacloban City', 'Face-to-Face', '2021-09-20', '2021-09-24', 40.0, 1, 'NAMRIA-GIS-2021-017', NULL, 'LGU Budget', 3000.00, 'QGIS navigation, georeferencing, land use mapping, LGU zoning overlay production', 'Part of Local Shelter Plan preparation'),
+(4, 'Occupational Health and Safety (OSH) for Construction Site Workers', 'Health & Safety', 'DOLE - Bureau of Working Conditions', 'Ormoc City', 'Face-to-Face', '2023-02-08', '2023-02-09', 16.0, 1, 'DOLE-OSH-2023-089', NULL, 'LGU Budget', 1500.00, 'Hazard identification, PPE standards, safe work practices, accident reporting', 'Mandatory for field engineering staff'),
+
+-- Employee 5 (Social Worker)
+(5, 'Social Case Work: Theories and Practice', 'Technical/Skills Training', 'DSWD Human Resource Development Center', 'Manila', 'Face-to-Face', '2021-11-08', '2021-11-12', 40.0, 1, 'DSWD-SCW-2021-034', NULL, 'LGU Budget', 6000.00, 'Assessment frameworks, intervention planning, case documentation, closure protocols', 'Standard for newly hired social workers'),
+(5, 'Persons with Disability (PWD) Rights and Services', 'Legal & Compliance', 'NCDA', 'Online via Zoom', 'Online/Virtual', '2022-06-08', '2022-06-10', 24.0, 1, 'NCDA-PWD-2022-019', NULL, 'LGU Budget', 0.00, 'RA 7277, PWD ID system, inclusive programming, reasonable accommodation', 'Required for MSWDO staff'),
+(5, 'Trauma-Informed Care Approach for Social Workers', 'Technical/Skills Training', 'IASC MHPSS Reference Group Philippines', 'Tacloban City', 'Face-to-Face', '2023-03-13', '2023-03-15', 24.0, 1, 'IASC-TIC-2023-006', NULL, 'LGU Budget', 2500.00, 'Trauma recognition, TIC principles, self-care strategies for frontline workers', 'Post-disaster MHPSS programming'),
+(5, 'Responsible Parenthood and Family Planning (RPFP) Counseling', 'Technical/Skills Training', 'Commission on Population', 'Cebu City', 'Face-to-Face', '2024-01-29', '2024-01-31', 24.0, 1, 'POPCOM-RPFP-2024-011', NULL, 'LGU Budget', 3000.00, 'Family planning methods, counseling skills, referral system, RPFP law provisions', 'Linked to MSWDO and health office programs'),
+
+-- Employee 6 (Accounting Staff)
+(6, 'Government Bookkeeping and Journal Entry Workshop', 'Financial Management', 'COA Region 8 Training Unit', 'Tacloban City', 'Face-to-Face', '2021-04-19', '2021-04-23', 40.0, 1, 'COA-JE-2021-008', NULL, 'LGU Budget', 2000.00, 'Journal entries under NGAS, subsidiary ledgers, trial balance preparation, adjustments', 'Required for all accounting section staff'),
+(6, 'National Tax Research Center (NTRC) - Basic Tax Seminar', 'Financial Management', 'NTRC - DOF', 'Online via Zoom', 'Online/Virtual', '2022-08-17', '2022-08-18', 16.0, 1, 'NTRC-TAX-2022-041', NULL, 'LGU Budget', 0.00, 'Income tax basics, VAT, withholding tax obligations of LGUs', 'Webinar open to all LGU finance staff'),
+(6, 'Certified Government Financial Analyst (CGFA) Review Program', 'Financial Management', 'Association of Government Accountants Philippines', 'Cebu City', 'Face-to-Face', '2023-07-10', '2023-07-14', 40.0, 1, 'AGAP-CGFA-2023-027', NULL, 'Employee', 15000.00, 'Government financial management framework, financial analysis, internal audit', 'Self-funded; currently pursuing CGFA certification'),
+
+-- Employee 7 (Clerk)
+(7, 'Civil Registration Laws and Procedures', 'Legal & Compliance', 'Philippine Statistics Authority (PSA)', 'PSA Regional Office, Tacloban City', 'Face-to-Face', '2022-04-04', '2022-04-08', 40.0, 1, 'PSA-CRL-2022-014', NULL, 'LGU Budget', 1500.00, 'RA 3753, COLB registration, late registration, annotation, OCRG forms and procedures', 'Mandatory orientation for new civil registry staff'),
+(7, 'Records Management and Archiving for LGUs', 'Technical/Skills Training', 'National Archives of the Philippines (NAP)', 'Online via Google Meet', 'Online/Virtual', '2023-01-25', '2023-01-27', 24.0, 1, 'NAP-RMA-2023-033', NULL, 'LGU Budget', 0.00, 'Filing systems, retention schedules, digitization basics, archival security', 'Capacity building for civil registrar staff'),
+(7, 'Customer Service Excellence in Government', 'Customer Service', 'Civil Service Commission (CSC)', 'CSC Regional Office, Tacloban City', 'Face-to-Face', '2023-09-11', '2023-09-12', 16.0, 1, 'CSC-CSE-2023-058', NULL, 'LGU Budget', 500.00, 'ARTA provisions, Mamamayan Muna program, frontline service standards, client charter', 'Required for client-facing government employees'),
+
+-- Employee 8 (Maintenance Worker)
+(8, 'Electrical Safety and Basic Wiring for Government Facilities', 'Health & Safety', 'DOLE-BWC', 'Tacloban City', 'Face-to-Face', '2021-08-09', '2021-08-11', 24.0, 1, 'DOLE-ES-2021-044', NULL, 'LGU Budget', 1000.00, 'Electrical hazard identification, grounding, circuit breaker maintenance, LOTO procedures', 'Mandatory for all maintenance workers'),
+(8, 'Plumbing and Sanitation Maintenance Workshop', 'Technical/Skills Training', 'TESDA Regional Office VIII', 'Ormoc City', 'Face-to-Face', '2022-05-16', '2022-05-20', 40.0, 1, 'TESDA-PSM-2022-012', NULL, 'LGU Budget', 1500.00, 'Pipe fitting, valve repair, drainage unclogging, sanitary facility maintenance', 'Aligned with TESDA plumbing NC II competencies'),
+(8, 'Occupational Safety and Health Standards (OSHS) Orientation', 'Health & Safety', 'DOLE Region 8', 'Tacloban City', 'Face-to-Face', '2023-06-05', '2023-06-05', 8.0, 1, 'DOLE-OSHS-2023-071', NULL, 'LGU Budget', 0.00, 'Workplace hazard recognition, PPE usage, accident reporting, emergency response basics', 'Annual safety orientation for utility staff'),
+
+-- Employee 9 (Cashier)
+(9, 'Cash Management and Disbursement Controls for LGUs', 'Financial Management', 'Bureau of Local Government Finance (BLGF)', 'Cebu City', 'Face-to-Face', '2021-02-22', '2021-02-26', 40.0, 1, 'BLGF-CMD-2021-017', NULL, 'LGU Budget', 5500.00, 'Cash flow forecasting, disbursement controls, petty cash fund management, trust funds', 'Sponsored for treasury cashier staff'),
+(9, 'Anti-Corruption and Accountability in Government Finance', 'Ethics & Anti-Corruption', 'Office of the Ombudsman', 'Online via Zoom', 'Online/Virtual', '2022-09-19', '2022-09-20', 16.0, 1, 'OMB-ACAG-2022-028', NULL, 'LGU Budget', 0.00, 'Graft and corruption laws, accountability of accountable officers, whistleblower protection', 'Required for all accountable officers'),
+(9, 'Digital Payment Systems and E-Governance for LGU Cashiers', 'Information Technology', 'DICT / BLGF', 'Online via MS Teams', 'Online/Virtual', '2024-03-04', '2024-03-06', 24.0, 1, 'DICT-DPS-2024-009', NULL, 'LGU Budget', 0.00, 'LGU e-payment platforms, QR code collection, online official receipts, cybersecurity basics', 'Capacity building for LGU digital transition'),
+
+-- Employee 10 (Collection Officer)
+(10, 'Real Property Tax Assessment and Collection Workshop', 'Financial Management', 'BLGF and LGU League of Treasurers', 'Tacloban City', 'Face-to-Face', '2020-02-17', '2020-02-21', 40.0, 1, 'BLGF-RPT-2020-031', NULL, 'LGU Budget', 4000.00, 'RPTA procedures, tax delinquency measures, tax mapping, collection efficiency strategies', 'Core training for collection officers'),
+(10, 'Revenue Enhancement Strategies for LGUs', 'Financial Management', 'DILG Region 8', 'Tacloban City', 'Face-to-Face', '2022-04-25', '2022-04-27', 24.0, 1, 'DILG-RES-2022-019', NULL, 'LGU Budget', 2000.00, 'Revenue code review, tax ordinance updating, fee schedule rationalisation, enforcement', 'Conducted as part of DILG LGU performance challenge'),
+(10, 'Public Financial Management (PFM) for Revenue Officers', 'Financial Management', 'DBM and DOF Joint Program', 'Online via Zoom', 'Online/Virtual', '2023-10-09', '2023-10-11', 24.0, 1, 'DBM-PFM-2023-044', NULL, 'LGU Budget', 0.00, 'Budget-revenue linkage, PFM reform agenda, fiscal transparency tools, performance-based budgeting', 'Part of national PFM reform capacity building');
+
+
+-- ============================================================
+-- SAMPLE DATA: employee_licenses_certifications
+-- ============================================================
+
+INSERT INTO `employee_licenses_certifications` (
+  `employee_id`, `license_name`, `license_type`, `issuing_body`,
+  `license_number`, `date_issued`, `date_of_exam`, `expiry_date`,
+  `rating`, `status`, `renewal_date`, `remarks`
+) VALUES
+
+-- Employee 1 (Treasurer)
+(1, 'Certified Public Accountant (CPA)', 'Professional License', 'Professional Regulation Commission (PRC)', 'CPA-0112345', '2011-05-20', '2011-05-10', NULL, 88.25, 'Active', '2025-05-20', 'Lifetime license; PRC ID renewed every 3 years'),
+(1, 'Civil Service Eligibility - Career Service Professional', 'Civil Service Eligibility', 'Civil Service Commission (CSC)', 'CSC-CSP-2010-08734', '2010-08-15', '2010-06-20', NULL, 82.50, 'Active', NULL, 'Required for all permanent government employees'),
+
+-- Employee 2 (Municipal Engineer)
+(2, 'Civil Engineer Licensure', 'Professional License', 'Professional Regulation Commission (PRC)', 'CE-0234567', '2010-07-10', '2010-07-01', NULL, 85.40, 'Active', '2026-07-10', 'Required for all licensed civil engineers in practice'),
+(2, 'Civil Service Eligibility - Career Service Professional', 'Civil Service Eligibility', 'Civil Service Commission (CSC)', 'CSC-CSP-2012-04412', '2012-09-10', '2012-08-05', NULL, 79.80, 'Active', NULL, 'Required for permanent government appointments'),
+(2, 'Project Management Professional (PMP)', 'Industry Certification', 'Project Management Institute (PMI)', 'PMP-PH-2019-88234', '2019-10-01', NULL, '2022-10-01', NULL, 'Expired', '2022-10-01', 'Lapsed; eligible for renewal via PDU submission'),
+
+-- Employee 3 (Nurse)
+(3, 'Registered Nurse Licensure', 'Professional License', 'Professional Regulation Commission (PRC)', 'RN-0345678', '2015-08-20', '2015-08-15', NULL, 82.60, 'Active', '2025-08-20', 'Renewed every 3 years with CPE units'),
+(3, 'Basic Life Support (BLS) Certification', 'Industry Certification', 'Philippine Heart Association', 'PHA-BLS-2022-0567', '2022-06-16', NULL, '2024-06-16', NULL, 'Expired', '2024-06-16', 'Expired; renewal scheduled'),
+(3, 'Civil Service Eligibility - Sub-professional', 'Civil Service Eligibility', 'Civil Service Commission (CSC)', 'CSC-SUB-2019-11234', '2019-10-05', '2019-09-01', NULL, 75.20, 'Active', NULL, 'Eligible for contractual/casual government positions'),
+
+-- Employee 4 (CAD Operator)
+(4, 'AutoCAD Certified User (ACU)', 'Industry Certification', 'Autodesk Authorized Training Center', 'ACU-2020-PH-04127', '2020-07-17', NULL, '2023-07-17', NULL, 'Expired', '2023-07-17', 'Lapsed; rescheduled for re-certification'),
+(4, 'Civil Service Eligibility - Sub-professional', 'Civil Service Eligibility', 'Civil Service Commission (CSC)', 'CSC-SUB-2018-23341', '2018-12-01', '2018-11-04', NULL, 78.00, 'Active', NULL, 'Passed prior to LGU employment'),
+
+-- Employee 5 (Social Worker)
+(5, 'Registered Social Worker (RSW)', 'Professional License', 'Professional Regulation Commission (PRC)', 'RSW-0445231', '2018-09-05', '2018-08-28', NULL, 77.50, 'Active', '2024-09-05', 'Renewable every 3 years with CPE credits'),
+(5, 'Civil Service Eligibility - Career Service Professional', 'Civil Service Eligibility', 'Civil Service Commission (CSC)', 'CSC-CSP-2018-33876', '2018-12-15', '2018-11-11', NULL, 80.10, 'Active', NULL, 'Required for plantilla social worker position'),
+
+-- Employee 6 (Accounting Staff)
+(6, 'Civil Service Eligibility - Career Service Professional', 'Civil Service Eligibility', 'Civil Service Commission (CSC)', 'CSC-CSP-2020-44178', '2020-09-15', '2020-08-02', NULL, 76.40, 'Active', NULL, 'Required for permanent accounting position'),
+(6, 'TESDA National Certificate II in Bookkeeping (NC II)', 'Government Certification', 'TESDA', 'TESDA-BKNCII-2019-07781', '2019-07-20', '2019-07-15', NULL, NULL, 'Active', NULL, 'Passed practical competency assessment'),
+
+-- Employee 7 (Clerk)
+(7, 'Civil Service Eligibility - Sub-professional', 'Civil Service Eligibility', 'Civil Service Commission (CSC)', 'CSC-SUB-2021-55432', '2021-11-10', '2021-10-03', NULL, 74.50, 'Active', NULL, 'Required for entry-level clerical government positions'),
+
+-- Employee 8 (Maintenance Worker)
+(8, 'TESDA National Certificate II in Electrical Installation and Maintenance (NC II)', 'Government Certification', 'TESDA', 'TESDA-EIMNC2-2021-02341', '2021-08-25', '2021-08-20', NULL, NULL, 'Active', NULL, 'Competency-based assessment passed at TESDA Regional Center'),
+(8, 'Civil Service Eligibility - Sub-professional', 'Civil Service Eligibility', 'Civil Service Commission (CSC)', 'CSC-SUB-2019-66431', '2019-10-05', '2019-09-01', NULL, 71.00, 'Active', NULL, 'Passed before casual appointment was regularized'),
+
+-- Employee 9 (Cashier)
+(9, 'Civil Service Eligibility - Career Service Professional', 'Civil Service Eligibility', 'Civil Service Commission (CSC)', 'CSC-CSP-2019-77821', '2019-08-12', '2019-06-09', NULL, 78.80, 'Active', NULL, 'Required for cashier plantilla position'),
+(9, 'TESDA National Certificate II in Bookkeeping (NC II)', 'Government Certification', 'TESDA', 'TESDA-BKNCII-2017-04512', '2017-05-15', '2017-05-10', NULL, NULL, 'Active', NULL, 'Certification obtained prior to LGU entry'),
+
+-- Employee 10 (Collection Officer)
+(10, 'Civil Service Eligibility - Career Service Professional', 'Civil Service Eligibility', 'Civil Service Commission (CSC)', 'CSC-CSP-2017-88143', '2017-06-20', '2017-05-07', NULL, 81.30, 'Active', NULL, 'Required for collection officer plantilla position'),
+(10, 'TESDA National Certificate III in Business Management (NC III)', 'Government Certification', 'TESDA', 'TESDA-BMNC3-2016-00871', '2016-09-05', '2016-09-01', NULL, NULL, 'Active', NULL, 'Acquired while working at Pag-IBIG');
+
+
+-- ============================================================
+-- SAMPLE DATA: employee_awards_recognition
+-- ============================================================
+
+INSERT INTO `employee_awards_recognition` (
+  `employee_id`, `award_title`, `award_type`, `awarding_body`, `date_received`, `description`, `remarks`
+) VALUES
+(1, 'Most Outstanding LGU Treasurer', 'Regional', 'BLGF Region 8', '2023-11-10', 'Awarded for excellence in revenue generation and fiscal management, posting the highest collection efficiency rate among municipalities in the region.', 'Voted by peers and evaluated by BLGF'),
+(1, 'Gawad sa Pinakamahusay na Manggagawa (Best Employee)', 'Internal Award', 'Municipal Government', '2022-04-27', 'Recognized as the Most Outstanding Employee of the Municipal Government for FY 2021.', 'Annual service award'),
+(2, 'Best Infrastructure Project Award', 'Municipal/City', 'Sangguniang Bayan', '2022-06-12', 'Recognized for spearheading the construction of a resilient multi-purpose evacuation center completed under budget and ahead of schedule.', 'Awarded during the municipality\'s foundation anniversary'),
+(3, 'Bayaning Frontliner Award', 'External Award', 'Provincial Government of Leyte', '2021-09-08', 'Recognized for exemplary service during the COVID-19 pandemic as part of the rapid deployment health team.', 'Province-wide recognition for health workers'),
+(5, 'Outstanding Social Worker of the Year', 'Municipal/City', 'Municipal Government / MSWDO', '2023-10-19', 'Awarded for exceptional delivery of social services and community outreach programs benefitting over 800 families.', 'Annual MSWDO awards night'),
+(6, 'Certificate of Commendation for Financial Accuracy', 'Internal Award', 'Municipal Accountant\'s Office', '2024-01-30', 'Recognized for maintaining zero discrepancy in voucher processing for FY 2023.', 'Issued during office performance review'),
+(9, 'Zero Cash Variance Awardee', 'Internal Award', 'Municipal Treasurer\'s Office', '2023-04-15', 'Awarded for maintaining perfect cash balance accuracy for 3 consecutive fiscal years (2020–2022).', 'Annual treasury performance awards'),
+(10, 'Best Collection Officer', 'Municipal/City', 'Municipal Government', '2023-12-01', 'Awarded for achieving 112% of the annual revenue collection target for FY 2023, the highest in the municipality\'s history.', 'Annual performance recognition program');
+
+
+-- ============================================================
+-- SAMPLE DATA: employee_voluntary_work
+-- ============================================================
+
+INSERT INTO `employee_voluntary_work` (
+  `employee_id`, `organization`, `position_nature_of_work`, `start_date`, `end_date`, `hours_per_week`, `description`
+) VALUES
+(1, 'Parish Finance Council - St. Joseph Parish', 'Finance Council Member', '2016-01-01', NULL, 2, 'Assists in reviewing parish financial statements, budget planning, and audit of church funds.'),
+(2, 'Gawad Kalinga - Tacloban Chapter', 'Volunteer Builder', '2014-06-01', '2018-12-31', 4, 'Participated in Bagong Tahanan housing construction drives; provided engineering layout guidance for volunteer builders.'),
+(3, 'Philippine Red Cross - Leyte Chapter', 'Volunteer Nurse / Blood Donor Coordinator', '2017-03-01', NULL, 3, 'Assists during blood donation drives, disaster response operations, and first aid training for community volunteers.'),
+(4, 'Engineers Without Borders Philippines', 'Technical Volunteer', '2020-01-01', '2022-06-30', 2, 'Provided pro-bono CAD drafting services for rural school rehabilitation projects in far-flung barangays.'),
+(5, 'Federation of Senior Citizens - Local Chapter', 'Social Services Volunteer', '2022-03-01', NULL, 3, 'Facilitates DSWD program orientation and benefit claiming assistance for senior citizen beneficiaries.'),
+(7, 'Barangay VAWC Desk', 'VAWC Volunteer Paralegal', '2022-06-01', NULL, 2, 'Assists barangay VAWC desk officer with documentation and initial intake interviews for VAWC cases.'),
+(8, 'Barangay Disaster Risk Reduction and Management Council (BDRRMC)', 'Volunteer Maintenance / Logistics Member', '2021-09-01', NULL, 3, 'Supports BDRRMC in maintaining evacuation center facilities, checking emergency equipment, and assisting during drills.'),
+(9, 'Parish Youth Ministry - San Lorenzo Ruiz Parish', 'Youth Finance Secretary', '2016-01-01', '2020-12-31', 2, 'Managed youth group funds, prepared financial reports for parish activities and fund-raising events.'),
+(10, 'Homeowners Association - Mabini Subd.', 'Association Treasurer', '2018-01-01', NULL, 2, 'Manages HOA dues collection, budget preparation, and disbursement reporting for subdivision common area maintenance.');
+
+
+
+
+ALTER TABLE `external_employment_history`
+  ADD CONSTRAINT `fk_ext_emp_employee` FOREIGN KEY (`employee_id`) REFERENCES `employees` (`employee_id`) ON DELETE CASCADE ON UPDATE CASCADE;
+
+ALTER TABLE `employee_seminars_trainings`
+  ADD CONSTRAINT `fk_seminar_employee` FOREIGN KEY (`employee_id`) REFERENCES `employees` (`employee_id`) ON DELETE CASCADE ON UPDATE CASCADE;
+
+ALTER TABLE `employee_licenses_certifications`
+  ADD CONSTRAINT `fk_license_employee` FOREIGN KEY (`employee_id`) REFERENCES `employees` (`employee_id`) ON DELETE CASCADE ON UPDATE CASCADE;
+
+ALTER TABLE `employee_awards_recognition`
+  ADD CONSTRAINT `fk_award_employee` FOREIGN KEY (`employee_id`) REFERENCES `employees` (`employee_id`) ON DELETE CASCADE ON UPDATE CASCADE;
+
+ALTER TABLE `employee_voluntary_work`
+  ADD CONSTRAINT `fk_vol_employee` FOREIGN KEY (`employee_id`) REFERENCES `employees` (`employee_id`) ON DELETE CASCADE ON UPDATE CASCADE;
+
 
 -- --------------------------------------------------------
-
 --
 -- Table structure for table `exits`
 --
@@ -1001,39 +1542,6 @@ CREATE TABLE `exit_checklist` (
   `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
   `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp()
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
-
---
--- Triggers `exit_checklist`
---
-DELIMITER $$
-CREATE TRIGGER `after_checklist_update` AFTER UPDATE ON `exit_checklist` FOR EACH ROW BEGIN
-    -- Log the change in audit table
-    IF OLD.status != NEW.status OR OLD.approval_status != NEW.approval_status OR OLD.clearance_status != NEW.clearance_status THEN
-        INSERT INTO exit_checklist_audit (checklist_id, action_type, field_changed, old_value, new_value, changed_by)
-        VALUES (NEW.checklist_id, 'Updated', 
-                CASE 
-                    WHEN OLD.status != NEW.status THEN 'status'
-                    WHEN OLD.approval_status != NEW.approval_status THEN 'approval_status'
-                    WHEN OLD.clearance_status != NEW.clearance_status THEN 'clearance_status'
-                    ELSE 'general'
-                END,
-                CASE 
-                    WHEN OLD.status != NEW.status THEN OLD.status
-                    WHEN OLD.approval_status != NEW.approval_status THEN OLD.approval_status
-                    WHEN OLD.clearance_status != NEW.clearance_status THEN OLD.clearance_status
-                    ELSE NULL
-                END,
-                CASE 
-                    WHEN OLD.status != NEW.status THEN NEW.status
-                    WHEN OLD.approval_status != NEW.approval_status THEN NEW.approval_status
-                    WHEN OLD.clearance_status != NEW.clearance_status THEN NEW.clearance_status
-                    ELSE NULL
-                END,
-                COALESCE(NEW.approved_by, 'System'));
-    END IF;
-END
-$$
-DELIMITER ;
 
 -- --------------------------------------------------------
 
@@ -1476,6 +1984,92 @@ CREATE TABLE `knowledge_transfers` (
   `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp()
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
+-- ═══════════════════════════════════════════════════════════════
+-- KT TABLES FIX – Run this in phpMyAdmin on hr_system database
+-- WARNING: This drops and recreates kt_documents and
+-- kt_document_versions. Only existing data will be lost.
+-- kt_responsibilities and kt_sessions are NOT affected.
+-- ═══════════════════════════════════════════════════════════════
+
+-- Step 1: Drop old tables (order matters due to any references)
+DROP TABLE IF EXISTS kt_document_versions;
+DROP TABLE IF EXISTS kt_documents;
+
+-- Step 2: Recreate kt_documents with correct column names
+CREATE TABLE kt_documents (
+    document_id         INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    transfer_id         INT UNSIGNED NOT NULL,
+    document_title      VARCHAR(255) NOT NULL,
+    document_type       ENUM('SOP','Manual','Credentials Guide','Workflow Diagram','Training Material','Meeting Notes','Other') NOT NULL DEFAULT 'Other',
+    description         TEXT,
+    current_version_id  INT UNSIGNED DEFAULT 0,
+    created_at          TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at          TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    INDEX idx_transfer  (transfer_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- Step 3: Recreate kt_document_versions with correct column names
+CREATE TABLE kt_document_versions (
+    version_id          INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    document_id         INT UNSIGNED NOT NULL,
+    version_number      SMALLINT UNSIGNED NOT NULL DEFAULT 1,
+    file_path           VARCHAR(500) NOT NULL,
+    file_name           VARCHAR(255) NOT NULL,
+    file_size           BIGINT UNSIGNED DEFAULT 0,
+    uploaded_by_name    VARCHAR(255),
+    upload_date         DATETIME DEFAULT CURRENT_TIMESTAMP,
+    notes               TEXT,
+    INDEX idx_document  (document_id),
+    UNIQUE KEY uq_doc_ver (document_id, version_number)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- Step 4: Also fix kt_responsibilities if it was created with wrong columns
+DROP TABLE IF EXISTS kt_responsibilities;
+CREATE TABLE kt_responsibilities (
+    responsibility_id   INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    transfer_id         INT UNSIGNED NOT NULL,
+    task_name           VARCHAR(255) NOT NULL,
+    description         TEXT,
+    priority            ENUM('High','Medium','Low') NOT NULL DEFAULT 'Medium',
+    priority_order      INT UNSIGNED DEFAULT 0,
+    assigned_receiver   VARCHAR(255),
+    completion_status   ENUM('Pending','In Progress','Completed') NOT NULL DEFAULT 'Pending',
+    is_completed        TINYINT(1) NOT NULL DEFAULT 0,
+    completed_at        DATETIME NULL,
+    remarks             TEXT,
+    created_at          TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at          TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    INDEX idx_transfer  (transfer_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- Step 5: Also fix kt_sessions if needed
+DROP TABLE IF EXISTS kt_sessions;
+CREATE TABLE kt_sessions (
+    session_id          INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    transfer_id         INT UNSIGNED NOT NULL,
+    session_date        DATE NOT NULL,
+    attendees           TEXT NOT NULL,
+    summary             TEXT NOT NULL,
+    action_items        TEXT,
+    meeting_notes_path  VARCHAR(500),
+    created_at          TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at          TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    INDEX idx_transfer  (transfer_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- Step 6: Add missing columns to knowledge_transfers if not already there
+ALTER TABLE knowledge_transfers
+    ADD COLUMN IF NOT EXISTS kt_status ENUM('Pending','Ongoing','Completed') NOT NULL DEFAULT 'Pending',
+    ADD COLUMN IF NOT EXISTS transfer_deadline DATE NULL,
+    ADD COLUMN IF NOT EXISTS created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP;
+
+-- ═══════════════════════════════════════════════════════════════
+-- Also make sure these folders exist on your server:
+--   /uploads/kt_docs/
+--   /uploads/kt_sessions/
+-- ═══════════════════════════════════════════════════════════════
+
 -- --------------------------------------------------------
 
 --
@@ -1782,57 +2376,62 @@ INSERT INTO `performance_review_cycles` (`cycle_id`, `cycle_name`, `start_date`,
 -- --------------------------------------------------------
 
 --
+
 --
--- Table structure for table `personal_information`
 --
+-- Modified personal_information table with marital status details
 
 CREATE TABLE `personal_information` (
-  `personal_info_id` int(11) NOT NULL,
+  `personal_info_id` int(11) NOT NULL AUTO_INCREMENT,
   `first_name` varchar(50) NOT NULL,
   `last_name` varchar(50) NOT NULL,
   `date_of_birth` date NOT NULL,
   `gender` enum('Male','Female','Non-binary','Prefer not to say') NOT NULL,
   `marital_status` enum('Single','Married','Divorced','Widowed') NOT NULL,
+  `marital_status_date` date DEFAULT NULL,
+  `spouse_name` varchar(100) DEFAULT NULL,
+  `marital_status_document` varchar(255) DEFAULT NULL,
+  `document_type` varchar(50) DEFAULT NULL,
+  `document_number` varchar(50) DEFAULT NULL,
+  `issuing_authority` varchar(150) DEFAULT NULL,
   `nationality` varchar(50) NOT NULL,
   `tax_id` varchar(20) DEFAULT NULL,
-  `social_security_number` varchar(20) DEFAULT NULL,
+  `gsis_id` varchar(20) DEFAULT NULL COMMENT 'Government Service Insurance System ID',
   `pag_ibig_id` varchar(20) DEFAULT NULL,
   `philhealth_id` varchar(20) DEFAULT NULL,
   `phone_number` varchar(20) NOT NULL,
   `emergency_contact_name` varchar(100) DEFAULT NULL,
   `emergency_contact_relationship` varchar(50) DEFAULT NULL,
   `emergency_contact_phone` varchar(20) DEFAULT NULL,
-  -- Educational Background Fields
   `highest_education_level` enum('Elementary','High School','Vocational/Technical','Associate Degree','Bachelor''s Degree','Master''s Degree','Doctorate','Other') DEFAULT NULL,
   `field_of_study` varchar(100) DEFAULT NULL,
   `institution_name` varchar(150) DEFAULT NULL,
   `graduation_year` year DEFAULT NULL,
+  `previous_job_experiences` longtext DEFAULT NULL COMMENT 'JSON array containing previous employment history before joining this organization',
   `certifications` text DEFAULT NULL,
   `additional_training` text DEFAULT NULL,
   `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
-  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp()
+  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
+  PRIMARY KEY (`personal_info_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
---
--- Dumping data for table `personal_information`
---
+INSERT INTO `personal_information` (`personal_info_id`, `first_name`, `last_name`, `date_of_birth`, `gender`, `marital_status`, `marital_status_date`, `spouse_name`, `marital_status_document`, `document_type`, `document_number`, `issuing_authority`, `nationality`, `tax_id`, `gsis_id`, `pag_ibig_id`, `philhealth_id`, `phone_number`, `emergency_contact_name`, `emergency_contact_relationship`, `emergency_contact_phone`, `highest_education_level`, `field_of_study`, `institution_name`, `graduation_year`, `previous_job_experiences`, `certifications`, `additional_training`, `created_at`, `updated_at`) VALUES
+(1, 'Maria', 'Santos', '1985-03-12', 'Female', 'Married', '2010-06-15', 'Carlos Santos', 'Marriage Certificate of Maria Reyes and Carlos Santos', 'Marriage Certificate', 'MC-2010-04321', 'Philippine Statistics Authority (PSA)', 'Filipino', '123-45-6789', '123456789', NULL, NULL, '0917-123-4567', 'Carlos Santos', 'Spouse', '0917-567-8901', 'Bachelor''s Degree', 'Business Administration', 'University of the Philippines', 2007, NULL, 'Certified Public Accountant (CPA)', 'Advanced Excel Training, Leadership Workshop', '2025-09-09 02:00:15', '2025-09-09 02:00:15'),
+(2, 'Roberto', 'Cruz', '1978-07-20', 'Male', 'Married', '2005-11-20', 'Elena Cruz', 'Marriage Certificate of Roberto Cruz and Elena Reyes', 'Marriage Certificate', 'MC-2005-08876', 'Philippine Statistics Authority (PSA)', 'Filipino', '234-56-7890', '234567890', NULL, NULL, '0917-234-5678', 'Elena Cruz', 'Spouse', '0917-678-9012', 'Master''s Degree', 'Information Technology', 'Ateneo de Manila University', 2002, NULL, 'Project Management Professional (PMP), ITIL Foundation', 'Agile Scrum Master Training', '2025-09-09 02:00:15', '2025-09-09 02:00:15'),
+(3, 'Jennifer', 'Reyes', '1988-11-08', 'Female', 'Single', NULL, NULL, NULL, 'None', NULL, NULL, 'Filipino', '345-67-8901', '345678901', NULL, NULL, '0917-345-6789', 'Mark Reyes', 'Brother', '0917-789-0123', 'Bachelor''s Degree', 'Marketing', 'De La Salle University', 2010, NULL, 'Google Analytics Certification, Digital Marketing Certificate', 'Social Media Marketing Bootcamp', '2025-09-09 02:00:15', '2025-09-09 02:00:15'),
+(4, 'Antonio', 'Garcia', '1975-01-25', 'Male', 'Divorced', '2015-03-10', 'Rosa Garcia', 'Decree of Legal Separation of Antonio and Rosa Garcia', 'Divorce Decree', 'DD-2015-00234', 'Regional Trial Court – Branch 45, Quezon City', 'Filipino', '456-78-9012', '456789012', NULL, NULL, '0917-456-7890', 'Rosa Garcia', 'Spouse', '0917-890-1234', 'Vocational/Technical', 'Automotive Technology', 'Technical Education and Skills Development Authority (TESDA)', 1995, NULL, 'NC II Automotive Servicing, Welding NC II', 'Heavy Equipment Operation Training', '2025-09-09 02:00:15', '2025-09-09 02:00:15'),
+(5, 'Lisa', 'Mendoza', '1982-09-14', 'Female', 'Widowed', '2019-07-22', 'John Mendoza', 'Death Certificate of John Mendoza', 'Death Certificate', 'DC-2019-06789', 'Philippine Statistics Authority (PSA)', 'Filipino', '567-89-0123', '567890123', NULL, NULL, '0917-567-8901', 'John Mendoza', 'Father', '0917-901-2345', 'Bachelor''s Degree', 'Nursing', 'University of Santo Tomas', 2004, NULL, 'Registered Nurse (RN), Basic Life Support (BLS)', 'Intensive Care Unit (ICU) Specialized Training', '2025-09-09 02:00:15', '2025-09-09 02:00:15'),
+(6, 'Michael', 'Torres', '1980-06-03', 'Male', 'Married', '2007-04-14', 'Anna Torres', 'Marriage Certificate of Michael Torres and Anna Reyes', 'Marriage Certificate', 'MC-2007-03345', 'Philippine Statistics Authority (PSA)', 'Filipino', '678-90-1234', '678901234', NULL, NULL, '0917-678-9012', 'Anna Torres', 'Spouse', '0917-012-3456', 'Bachelor''s Degree', 'Civil Engineering', 'Mapua University', 2002, NULL, 'Licensed Civil Engineer, LEED Green Associate', 'Construction Management Seminar', '2025-09-09 02:00:15', '2025-09-09 02:00:15'),
+(7, 'Carmen', 'Dela Cruz', '1987-12-18', 'Female', 'Single', NULL, NULL, NULL, 'None', NULL, NULL, 'Filipino', '789-01-2345', '789012345', NULL, NULL, '0917-789-0123', 'Pedro Dela Cruz', 'Father', '0917-123-4567', 'Bachelor''s Degree', 'Education', 'Philippine Normal University', 2009, NULL, 'Licensed Professional Teacher (LPT)', 'Child Psychology Training, Montessori Method Workshop', '2025-09-09 02:00:15', '2025-09-09 02:00:15'),
+(8, 'Ricardo', 'Villanueva', '1970-04-07', 'Male', 'Married', '1995-08-20', 'Diana Villanueva', 'Marriage Certificate of Ricardo Villanueva and Diana Santos', 'Marriage Certificate', 'MC-1995-01123', 'Philippine Statistics Authority (PSA)', 'Filipino', '890-12-3456', '890123456', NULL, NULL, '0917-890-1234', 'Diana Villanueva', 'Spouse', '0917-234-5678', 'High School', NULL, 'San Juan National High School', 1988, NULL, 'Sales Excellence Certificate', 'Customer Service Training, Product Knowledge Seminars', '2025-09-09 02:00:15', '2025-09-09 02:00:15'),
+(9, 'Sandra', 'Pascual', '1984-08-29', 'Female', 'Married', '2009-02-14', 'Luis Pascual', 'Marriage Certificate of Sandra Reyes and Luis Pascual', 'Marriage Certificate', 'MC-2009-05567', 'Philippine Statistics Authority (PSA)', 'Filipino', '901-23-4567', '901234567', NULL, NULL, '0917-901-2345', 'Luis Pascual', 'Spouse', '0917-345-6789', 'Master''s Degree', 'Human Resource Management', 'Asian Institute of Management', 2008, NULL, 'SHRM-CP, Certified Compensation Professional', 'Organizational Development Training', '2025-09-09 02:00:15', '2025-09-09 02:00:15'),
+(10, 'Jose', 'Ramos', '1972-05-15', 'Male', 'Married', '1998-12-01', 'Teresa Ramos', 'Marriage Certificate of Jose Ramos and Teresa Cruz', 'Marriage Certificate', 'MC-1998-02234', 'Philippine Statistics Authority (PSA)', 'Filipino', '012-34-5678', '012345678', NULL, NULL, '0917-012-3456', 'Teresa Ramos', 'Spouse', '0917-456-7890', 'Bachelor''s Degree', 'Electrical Engineering', 'Polytechnic University of the Philippines', 1994, NULL, 'Licensed Electrical Engineer', 'Power Systems Analysis Training', '2025-09-09 02:00:15', '2025-09-09 02:00:15'),
+(11, 'Ana', 'Morales', '1986-10-30', 'Female', 'Single', NULL, NULL, NULL, 'None', NULL, NULL, 'Filipino', '123-56-7890', '123567890', NULL, NULL, '0917-135-7890', 'Maria Morales', 'Mother', '0917-579-0123', 'Bachelor''s Degree', 'Psychology', 'University of the Philippines', 2008, NULL, 'Licensed Psychologist, Certified Career Coach', 'Cognitive Behavioral Therapy Workshop', '2025-09-09 02:00:15', '2025-09-09 02:00:15'),
+(12, 'Pablo', 'Fernandez', '1979-02-22', 'Male', 'Married', '2003-05-17', 'Carmen Fernandez', 'Marriage Certificate of Pablo Fernandez and Carmen Dela Cruz', 'Marriage Certificate', 'MC-2003-06678', 'Philippine Statistics Authority (PSA)', 'Filipino', '234-67-8901', '234678901', NULL, NULL, '0917-246-7890', 'Carmen Fernandez', 'Spouse', '0917-680-1234', 'Vocational/Technical', 'Computer Technology', 'TESDA', 1998, NULL, 'Computer Systems Servicing NC II', 'Web Development Bootcamp, Network Administration', '2025-09-09 02:00:15', '2025-09-09 02:00:15'),
+(13, 'Grace', 'Lopez', '1983-09-07', 'Female', 'Married', '2008-01-19', 'David Lopez', 'Marriage Certificate of Grace Santos and David Lopez', 'Marriage Certificate', 'MC-2008-04456', 'Philippine Statistics Authority (PSA)', 'Filipino', '345-78-9012', '345789012', NULL, NULL, '0917-357-8901', 'David Lopez', 'Spouse', '0917-791-2345', 'Bachelor''s Degree', 'Accountancy', 'Far Eastern University', 2005, NULL, 'Certified Public Accountant (CPA), Certified Internal Auditor', 'Tax Planning and Management Seminar', '2025-09-09 02:00:15', '2025-09-09 02:00:15'),
+(14, 'Eduardo', 'Hernandez', '1977-12-03', 'Male', 'Married', '2004-09-25', 'Sofia Hernandez', 'Marriage Certificate of Eduardo Hernandez and Sofia Reyes', 'Marriage Certificate', 'MC-2004-07789', 'Philippine Statistics Authority (PSA)', 'Filipino', '456-89-0123', '456890123', NULL, NULL, '0917-468-9012', 'Sofia Hernandez', 'Spouse', '0917-802-3456', 'Bachelor''s Degree', 'Architecture', 'University of Santo Tomas', 2000, NULL, 'Licensed Architect', 'Sustainable Design Workshop, BIM Training', '2025-09-09 02:00:15', '2025-09-09 02:00:15'),
+(15, 'Rosario', 'Gonzales', '1989-06-28', 'Female', 'Single', NULL, NULL, NULL, 'None', NULL, NULL, 'Filipino', '567-90-1234', '567901234', NULL, NULL, '0917-579-0123', 'Miguel Gonzales', 'Father', '0917-913-4567', 'Bachelor''s Degree', 'Communication Arts', 'University of the Philippines', 2011, NULL, 'Certified Digital Content Creator', 'Video Production Workshop, Social Media Strategy Training', '2025-09-09 02:00:15', '2025-09-09 02:00:15');
 
-INSERT INTO `personal_information` (`personal_info_id`, `first_name`, `last_name`, `date_of_birth`, `gender`, `marital_status`, `nationality`, `tax_id`, `social_security_number`, `pag_ibig_id`, `philhealth_id`, `phone_number`, `emergency_contact_name`, `emergency_contact_relationship`, `emergency_contact_phone`, `highest_education_level`, `field_of_study`, `institution_name`, `graduation_year`, `certifications`, `additional_training`, `created_at`, `updated_at`) VALUES
-(1, 'Maria', 'Santos', '1985-03-12', 'Female', 'Married', 'Filipino', '123-45-6789', '123456789', NULL, NULL, '0917-123-4567', 'Carlos Santos', 'Spouse', '0917-567-8901', 'Bachelor''s Degree', 'Business Administration', 'University of the Philippines', 2007, 'Certified Public Accountant (CPA)', 'Advanced Excel Training, Leadership Workshop', '2025-09-09 02:00:15', '2025-09-09 02:00:15'),
-(2, 'Roberto', 'Cruz', '1978-07-20', 'Male', 'Married', 'Filipino', '234-56-7890', '234567890', NULL, NULL, '0917-234-5678', 'Elena Cruz', 'Spouse', '0917-678-9012', 'Master''s Degree', 'Information Technology', 'Ateneo de Manila University', 2002, 'Project Management Professional (PMP), ITIL Foundation', 'Agile Scrum Master Training', '2025-09-09 02:00:15', '2025-09-09 02:00:15'),
-(3, 'Jennifer', 'Reyes', '1988-11-08', 'Female', 'Single', 'Filipino', '345-67-8901', '345678901', NULL, NULL, '0917-345-6789', 'Mark Reyes', 'Brother', '0917-789-0123', 'Bachelor''s Degree', 'Marketing', 'De La Salle University', 2010, 'Google Analytics Certification, Digital Marketing Certificate', 'Social Media Marketing Bootcamp', '2025-09-09 02:00:15', '2025-09-09 02:00:15'),
-(4, 'Antonio', 'Garcia', '1975-01-25', 'Male', 'Married', 'Filipino', '456-78-9012', '456789012', NULL, NULL, '0917-456-7890', 'Rosa Garcia', 'Spouse', '0917-890-1234', 'Vocational/Technical', 'Automotive Technology', 'Technical Education and Skills Development Authority (TESDA)', 1995, 'NC II Automotive Servicing, Welding NC II', 'Heavy Equipment Operation Training', '2025-09-09 02:00:15', '2025-09-09 02:00:15'),
-(5, 'Lisa', 'Mendoza', '1982-09-14', 'Female', 'Divorced', 'Filipino', '567-89-0123', '567890123', NULL, NULL, '0917-567-8901', 'John Mendoza', 'Father', '0917-901-2345', 'Bachelor''s Degree', 'Nursing', 'University of Santo Tomas', 2004, 'Registered Nurse (RN), Basic Life Support (BLS)', 'Intensive Care Unit (ICU) Specialized Training', '2025-09-09 02:00:15', '2025-09-09 02:00:15'),
-(6, 'Michael', 'Torres', '1980-06-03', 'Male', 'Married', 'Filipino', '678-90-1234', '678901234', NULL, NULL, '0917-678-9012', 'Anna Torres', 'Spouse', '0917-012-3456', 'Bachelor''s Degree', 'Civil Engineering', 'Mapua University', 2002, 'Licensed Civil Engineer, LEED Green Associate', 'Construction Management Seminar', '2025-09-09 02:00:15', '2025-09-09 02:00:15'),
-(7, 'Carmen', 'Dela Cruz', '1987-12-18', 'Female', 'Single', 'Filipino', '789-01-2345', '789012345', NULL, NULL, '0917-789-0123', 'Pedro Dela Cruz', 'Father', '0917-123-4567', 'Bachelor''s Degree', 'Education', 'Philippine Normal University', 2009, 'Licensed Professional Teacher (LPT)', 'Child Psychology Training, Montessori Method Workshop', '2025-09-09 02:00:15', '2025-09-09 02:00:15'),
-(8, 'Ricardo', 'Villanueva', '1970-04-07', 'Male', 'Married', 'Filipino', '890-12-3456', '890123456', NULL, NULL, '0917-890-1234', 'Diana Villanueva', 'Spouse', '0917-234-5678', 'High School', NULL, 'San Juan National High School', 1988, 'Sales Excellence Certificate', 'Customer Service Training, Product Knowledge Seminars', '2025-09-09 02:00:15', '2025-09-09 02:00:15'),
-(9, 'Sandra', 'Pascual', '1984-08-29', 'Female', 'Married', 'Filipino', '901-23-4567', '901234567', NULL, NULL, '0917-901-2345', 'Luis Pascual', 'Spouse', '0917-345-6789', 'Master''s Degree', 'Human Resource Management', 'Asian Institute of Management', 2008, 'SHRM-CP, Certified Compensation Professional', 'Organizational Development Training', '2025-09-09 02:00:15', '2025-09-09 02:00:15'),
-(10, 'Jose', 'Ramos', '1972-05-15', 'Male', 'Married', 'Filipino', '012-34-5678', '012345678', NULL, NULL, '0917-012-3456', 'Teresa Ramos', 'Spouse', '0917-456-7890', 'Bachelor''s Degree', 'Electrical Engineering', 'Polytechnic University of the Philippines', 1994, 'Licensed Electrical Engineer', 'Power Systems Analysis Training', '2025-09-09 02:00:15', '2025-09-09 02:00:15'),
-(11, 'Ana', 'Morales', '1986-10-30', 'Female', 'Single', 'Filipino', '123-56-7890', '123567890', NULL, NULL, '0917-135-7890', 'Maria Morales', 'Mother', '0917-579-0123', 'Bachelor''s Degree', 'Psychology', 'University of the Philippines', 2008, 'Licensed Psychologist, Certified Career Coach', 'Cognitive Behavioral Therapy Workshop', '2025-09-09 02:00:15', '2025-09-09 02:00:15'),
-(12, 'Pablo', 'Fernandez', '1979-02-22', 'Male', 'Married', 'Filipino', '234-67-8901', '234678901', NULL, NULL, '0917-246-7890', 'Carmen Fernandez', 'Spouse', '0917-680-1234', 'Vocational/Technical', 'Computer Technology', 'TESDA', 1998, 'Computer Systems Servicing NC II', 'Web Development Bootcamp, Network Administration', '2025-09-09 02:00:15', '2025-09-09 02:00:15'),
-(13, 'Grace', 'Lopez', '1983-09-07', 'Female', 'Married', 'Filipino', '345-78-9012', '345789012', NULL, NULL, '0917-357-8901', 'David Lopez', 'Spouse', '0917-791-2345', 'Bachelor''s Degree', 'Accountancy', 'Far Eastern University', 2005, 'Certified Public Accountant (CPA), Certified Internal Auditor', 'Tax Planning and Management Seminar', '2025-09-09 02:00:15', '2025-09-09 02:00:15'),
-(14, 'Eduardo', 'Hernandez', '1977-12-03', 'Male', 'Married', 'Filipino', '456-89-0123', '456890123', NULL, NULL, '0917-468-9012', 'Sofia Hernandez', 'Spouse', '0917-802-3456', 'Bachelor''s Degree', 'Architecture', 'University of Santo Tomas', 2000, 'Licensed Architect', 'Sustainable Design Workshop, BIM Training', '2025-09-09 02:00:15', '2025-09-09 02:00:15'),
-(15, 'Rosario', 'Gonzales', '1989-06-28', 'Female', 'Single', 'Filipino', '567-90-1234', '567901234', NULL, NULL, '0917-579-0123', 'Miguel Gonzales', 'Father', '0917-913-4567', 'Bachelor''s Degree', 'Communication Arts', 'University of the Philippines', 2011, 'Certified Digital Content Creator', 'Video Production Workshop, Social Media Strategy Training', '2025-09-09 02:00:15', '2025-09-09 02:00:15');
 
 -- --------------------------------------------------------
 
@@ -1854,6 +2453,14 @@ CREATE TABLE `post_exit_surveys` (
   `evaluation_score` int(11) DEFAULT 0,
   `evaluation_criteria` text DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+CREATE TABLE IF NOT EXISTS survey_notifications (
+    notif_id        INT      AUTO_INCREMENT PRIMARY KEY,
+    exit_id         INT      NOT NULL UNIQUE,
+    sent_by_user_id INT      NULL,
+    sent_at         DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    INDEX (exit_id)
+);
 
 -- --------------------------------------------------------
 
@@ -2061,23 +2668,20 @@ CREATE TABLE `trainers` (
 --
 -- Table structure for table `training_courses`
 --
-
-CREATE TABLE `training_courses` (
-  `course_id` int(11) NOT NULL,
-  `course_name` varchar(255) NOT NULL,
-  `description` text DEFAULT NULL,
-  `category` varchar(100) DEFAULT NULL,
-  `delivery_method` enum('Online','Classroom','Workshop','Self-paced','Hybrid') NOT NULL,
-  `duration` int(11) DEFAULT NULL COMMENT 'Duration in hours',
-  `max_participants` int(11) DEFAULT NULL,
-  `prerequisites` text DEFAULT NULL,
-  `materials_url` varchar(255) DEFAULT NULL,
-  `status` enum('Active','Inactive','In Development') DEFAULT 'Active',
-  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
-  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp()
+CREATE TABLE training_courses (
+  course_id int(11) NOT NULL,
+  course_name varchar(255) NOT NULL,
+  description text DEFAULT NULL,
+  category varchar(100) DEFAULT NULL,
+  delivery_method enum('Classroom Training','Online Learning','Blended Learning','Workshop','Seminar','Webinar','Self-Paced','On-the-Job Training') NOT NULL,
+  duration int(11) DEFAULT NULL COMMENT 'Duration in hours',
+  max_participants int(11) DEFAULT NULL,
+  prerequisites text DEFAULT NULL,
+  materials_url varchar(255) DEFAULT NULL,
+  status enum('Active','Inactive','In Development') DEFAULT 'Active',
+  created_at timestamp NOT NULL DEFAULT current_timestamp(),
+  updated_at timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp()
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
-
--- --------------------------------------------------------
 
 --
 -- Table structure for table `training_enrollments`
@@ -2132,6 +2736,105 @@ CREATE TABLE `training_sessions` (
   `capacity` int(11) NOT NULL,
   `cost_per_participant` decimal(10,2) DEFAULT NULL,
   `status` enum('Scheduled','In Progress','Completed','Cancelled') DEFAULT 'Scheduled',
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+-- --------------------------------------------------------
+--
+-- Learning & Development (L&D) - Certifications, Assignments, Feedback
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `certifications`
+--
+CREATE TABLE `certifications` (
+  `certification_id` int(11) NOT NULL,
+  `employee_id` int(11) NOT NULL,
+  `skill_id` int(11) DEFAULT NULL,
+  `certification_name` varchar(255) NOT NULL,
+  `issuing_organization` varchar(255) NOT NULL,
+  `certification_number` varchar(100) DEFAULT NULL,
+  `category` varchar(100) DEFAULT NULL,
+  `proficiency_level` enum('Beginner','Intermediate','Advanced','Expert') NOT NULL,
+  `assessment_score` decimal(5,2) DEFAULT NULL,
+  `issue_date` date NOT NULL,
+  `expiry_date` date DEFAULT NULL,
+  `assessed_date` date NOT NULL,
+  `certification_url` varchar(500) DEFAULT NULL,
+  `certificate_file_path` varchar(500) DEFAULT NULL,
+  `status` enum('Active','Expired','Suspended','Pending Renewal') DEFAULT 'Active',
+  `verification_status` enum('Verified','Pending','Failed') DEFAULT 'Pending',
+  `cost` decimal(10,2) DEFAULT 0.00,
+  `training_hours` int(11) DEFAULT 0,
+  `cpe_credits` decimal(5,2) DEFAULT 0.00,
+  `renewal_required` tinyint(1) DEFAULT 0,
+  `renewal_period_months` int(11) DEFAULT NULL,
+  `renewal_reminder_sent` tinyint(1) DEFAULT 0,
+  `next_renewal_date` date DEFAULT NULL,
+  `prerequisites` text DEFAULT NULL,
+  `description` text DEFAULT NULL,
+  `notes` text DEFAULT NULL,
+  `tags` varchar(255) DEFAULT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `employee_assignments`
+--
+CREATE TABLE `employee_assignments` (
+  `assignment_id` int(11) NOT NULL,
+  `employee_id` int(11) NOT NULL,
+  `assignment_type` enum('Training','Project','Task','Mentorship','Special Assignment') NOT NULL,
+  `assignment_title` varchar(255) NOT NULL,
+  `description` text DEFAULT NULL,
+  `session_id` int(11) DEFAULT NULL,
+  `course_id` int(11) DEFAULT NULL,
+  `assigned_date` date NOT NULL,
+  `start_date` date NOT NULL,
+  `due_date` date NOT NULL,
+  `completion_date` date DEFAULT NULL,
+  `status` enum('Assigned','In Progress','Completed','Overdue','Cancelled') DEFAULT 'Assigned',
+  `progress_percentage` decimal(5,2) DEFAULT 0.00,
+  `assigned_by_employee_id` int(11) DEFAULT NULL,
+  `department_id` int(11) DEFAULT NULL,
+  `priority` enum('Low','Medium','High','Urgent') DEFAULT 'Medium',
+  `estimated_hours` decimal(5,2) DEFAULT NULL,
+  `actual_hours` decimal(5,2) DEFAULT NULL,
+  `completion_notes` text DEFAULT NULL,
+  `evaluation_rating` int(11) DEFAULT NULL,
+  `evaluation_comments` text DEFAULT NULL,
+  `attachments_url` varchar(500) DEFAULT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `training_feedback`
+--
+CREATE TABLE `training_feedback` (
+  `feedback_id` int(11) NOT NULL,
+  `employee_id` int(11) NOT NULL,
+  `feedback_type` enum('Training Session','Learning Resource','Trainer','Course') NOT NULL,
+  `session_id` int(11) DEFAULT NULL,
+  `resource_id` int(11) DEFAULT NULL,
+  `trainer_id` int(11) DEFAULT NULL,
+  `course_id` int(11) DEFAULT NULL,
+  `overall_rating` int(11) NOT NULL,
+  `content_rating` int(11) DEFAULT NULL,
+  `instructor_rating` int(11) DEFAULT NULL,
+  `what_worked_well` text DEFAULT NULL,
+  `what_could_improve` text DEFAULT NULL,
+  `additional_comments` text DEFAULT NULL,
+  `would_recommend` tinyint(1) DEFAULT 1,
+  `met_expectations` tinyint(1) DEFAULT 1,
+  `feedback_date` date NOT NULL DEFAULT curdate(),
+  `is_anonymous` tinyint(1) DEFAULT 0,
   `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
   `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp()
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
@@ -2200,13 +2903,6 @@ INSERT INTO `user_roles` (`role_id`, `role_name`, `description`) VALUES
 (3, 'employee', 'Standard employee role with limited access to personal information and timesheets.');
 
 -- --------------------------------------------------------
-
---
--- Structure for view `exit_clearance_summary`
---
-DROP TABLE IF EXISTS `exit_clearance_summary`;
-
-CREATE ALGORITHM=UNDEFINED DEFINER=`root`@`localhost` SQL SECURITY DEFINER VIEW `exit_clearance_summary`  AS SELECT `e`.`exit_id` AS `exit_id`, `e`.`employee_id` AS `employee_id`, concat(`pi`.`first_name`,' ',`pi`.`last_name`) AS `employee_name`, `ep`.`employee_number` AS `employee_number`, `e`.`exit_date` AS `exit_date`, count(`ec`.`checklist_id`) AS `total_items`, sum(case when `ec`.`status` = 'Completed' then 1 else 0 end) AS `completed_items`, sum(case when `ec`.`approval_status` = 'Approved' then 1 else 0 end) AS `approved_items`, sum(case when `ec`.`clearance_status` = 'Cleared' then 1 else 0 end) AS `cleared_items`, CASE WHEN count(`ec`.`checklist_id`) = sum(case when `ec`.`clearance_status` = 'Cleared' then 1 else 0 end) THEN 'Fully Cleared' WHEN sum(case when `ec`.`clearance_status` = 'Cleared' then 1 else 0 end) > 0 THEN 'Partially Cleared' ELSE 'Not Cleared' END AS `overall_clearance_status` FROM (((`exits` `e` left join `employee_profiles` `ep` on(`e`.`employee_id` = `ep`.`employee_id`)) left join `personal_information` `pi` on(`ep`.`personal_info_id` = `pi`.`personal_info_id`)) left join `exit_checklist` `ec` on(`e`.`exit_id` = `ec`.`exit_id`)) GROUP BY `e`.`exit_id`, `e`.`employee_id`, `pi`.`first_name`, `pi`.`last_name`, `ep`.`employee_number`, `e`.`exit_date` ;
 
 --
 -- Indexes for dumped tables
@@ -2327,7 +3023,6 @@ ALTER TABLE `document_management`
 -- Indexes for table `educational_background`
 --
 ALTER TABLE `educational_background`
-  ADD PRIMARY KEY (`education_id`),
   ADD KEY `personal_info_id` (`personal_info_id`);
 
 --
@@ -2405,20 +3100,26 @@ ALTER TABLE `employee_skills`
   ADD KEY `skill_id` (`skill_id`);
 
 --
--- Indexes for table `employment_history`
---
-ALTER TABLE `employment_history`
-  ADD PRIMARY KEY (`history_id`),
-  ADD KEY `employee_id` (`employee_id`),
-  ADD KEY `department_id` (`department_id`),
-  ADD KEY `reporting_manager_id` (`reporting_manager_id`);
-
---
 -- Indexes for table `exits`
 --
 ALTER TABLE `exits`
   ADD PRIMARY KEY (`exit_id`),
   ADD KEY `employee_id` (`employee_id`);
+
+  ALTER TABLE exits 
+MODIFY COLUMN status ENUM(
+    'Pending',
+    'Under Review',
+    'Request Revision',
+    'Approved',
+    'Rejected',
+    'Processing',
+    'Clearance Ongoing',
+    'Exit Interview Scheduled',
+    'On Hold',
+    'Withdrawn',
+    'Completed'
+) NOT NULL DEFAULT 'Pending';
 
 --
 -- Indexes for table `exit_checklist`
@@ -2575,6 +3276,73 @@ ALTER TABLE `knowledge_transfers`
   ADD KEY `exit_id` (`exit_id`),
   ADD KEY `employee_id` (`employee_id`);
 
+  -- ═══════════════════════════════════════════════════════════════
+-- KNOWLEDGE TRANSFER SYSTEM – Run this in phpMyAdmin or MySQL
+-- Database: hr_system
+-- ═══════════════════════════════════════════════════════════════
+
+-- 1. Add new columns to existing knowledge_transfers table
+ALTER TABLE knowledge_transfers
+    ADD COLUMN IF NOT EXISTS kt_status ENUM('Pending','Ongoing','Completed') NOT NULL DEFAULT 'Pending',
+    ADD COLUMN IF NOT EXISTS transfer_deadline DATE NULL,
+    ADD COLUMN IF NOT EXISTS created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP;
+
+-- 2. KT RESPONSIBILITIES
+CREATE TABLE IF NOT EXISTS kt_responsibilities (
+    responsibility_id   INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    transfer_id         INT UNSIGNED NOT NULL,
+    task_name           VARCHAR(255) NOT NULL,
+    description         TEXT,
+    priority            ENUM('High','Medium','Low') NOT NULL DEFAULT 'Medium',
+    priority_order      INT UNSIGNED DEFAULT 0,
+    assigned_receiver   VARCHAR(255),
+    completion_status   ENUM('Pending','In Progress','Completed') NOT NULL DEFAULT 'Pending',
+    is_completed        TINYINT(1) NOT NULL DEFAULT 0,
+    completed_at        DATETIME NULL,
+    remarks             TEXT,
+    created_at          TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at          TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- 3. KT DOCUMENTS (master record per document)
+CREATE TABLE IF NOT EXISTS kt_documents (
+    document_id         INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    transfer_id         INT UNSIGNED NOT NULL,
+    document_title      VARCHAR(255) NOT NULL,
+    document_type       ENUM('SOP','Manual','Credentials Guide','Workflow Diagram','Training Material','Meeting Notes','Other') NOT NULL DEFAULT 'Other',
+    description         TEXT,
+    current_version_id  INT UNSIGNED DEFAULT 0,
+    created_at          TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at          TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- 4. KT DOCUMENT VERSIONS (revision history per document)
+CREATE TABLE IF NOT EXISTS kt_document_versions (
+    version_id          INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    document_id         INT UNSIGNED NOT NULL,
+    version_number      SMALLINT UNSIGNED NOT NULL DEFAULT 1,
+    file_path           VARCHAR(500) NOT NULL,
+    file_name           VARCHAR(255) NOT NULL,
+    file_size           BIGINT UNSIGNED DEFAULT 0,
+    uploaded_by_name    VARCHAR(255),
+    upload_date         DATETIME DEFAULT CURRENT_TIMESTAMP,
+    notes               TEXT
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- 5. KT SESSIONS (knowledge sharing meetings)
+CREATE TABLE IF NOT EXISTS kt_sessions (
+    session_id          INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    transfer_id         INT UNSIGNED NOT NULL,
+    session_date        DATE NOT NULL,
+    attendees           TEXT NOT NULL,
+    summary             TEXT NOT NULL,
+    action_items        TEXT,
+    meeting_notes_path  VARCHAR(500),
+    created_at          TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at          TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
 --
 -- Indexes for table `learning_resources`
 --
@@ -2671,8 +3439,6 @@ ALTER TABLE `performance_review_cycles`
 --
 -- Indexes for table `personal_information`
 --
-ALTER TABLE `personal_information`
-  ADD PRIMARY KEY (`personal_info_id`);
 
 --
 -- Indexes for table `post_exit_surveys`
@@ -2681,6 +3447,9 @@ ALTER TABLE `post_exit_surveys`
   ADD PRIMARY KEY (`survey_id`),
   ADD KEY `employee_id` (`employee_id`),
   ADD KEY `exit_id` (`exit_id`);
+
+  ALTER TABLE post_exit_surveys 
+ADD COLUMN submitted_by_employee TINYINT(1) NOT NULL DEFAULT 0;
 
 --
 -- Indexes for table `public_holidays`
@@ -2771,6 +3540,36 @@ ALTER TABLE `training_sessions`
   ADD PRIMARY KEY (`session_id`),
   ADD KEY `course_id` (`course_id`),
   ADD KEY `trainer_id` (`trainer_id`);
+
+--
+-- Indexes for table `certifications`
+--
+ALTER TABLE `certifications`
+  ADD PRIMARY KEY (`certification_id`),
+  ADD KEY `employee_id` (`employee_id`),
+  ADD KEY `skill_id` (`skill_id`);
+
+--
+-- Indexes for table `employee_assignments`
+--
+ALTER TABLE `employee_assignments`
+  ADD PRIMARY KEY (`assignment_id`),
+  ADD KEY `employee_id` (`employee_id`),
+  ADD KEY `session_id` (`session_id`),
+  ADD KEY `course_id` (`course_id`),
+  ADD KEY `assigned_by_employee_id` (`assigned_by_employee_id`),
+  ADD KEY `department_id` (`department_id`);
+
+--
+-- Indexes for table `training_feedback`
+--
+ALTER TABLE `training_feedback`
+  ADD PRIMARY KEY (`feedback_id`),
+  ADD KEY `employee_id` (`employee_id`),
+  ADD KEY `session_id` (`session_id`),
+  ADD KEY `resource_id` (`resource_id`),
+  ADD KEY `trainer_id` (`trainer_id`),
+  ADD KEY `course_id` (`course_id`);
 
 --
 -- Indexes for table `users`
@@ -2880,12 +3679,6 @@ ALTER TABLE `development_plans`
 --
 ALTER TABLE `document_management`
   MODIFY `document_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=33;
-
---
--- AUTO_INCREMENT for table `educational_background`
---
-ALTER TABLE `educational_background`
-  MODIFY `education_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=6;
 
 --
 -- AUTO_INCREMENT for table `employee_benefits`
@@ -3146,11 +3939,6 @@ ALTER TABLE `performance_review_cycles`
   MODIFY `cycle_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=5;
 
 --
--- AUTO_INCREMENT for table `personal_information`
---
-ALTER TABLE `personal_information`
-  MODIFY `personal_info_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=16;
-
 --
 -- AUTO_INCREMENT for table `post_exit_surveys`
 --
@@ -3234,6 +4022,24 @@ ALTER TABLE `training_needs_assessment`
 --
 ALTER TABLE `training_sessions`
   MODIFY `session_id` int(11) NOT NULL AUTO_INCREMENT;
+
+--
+-- AUTO_INCREMENT for table `certifications`
+--
+ALTER TABLE `certifications`
+  MODIFY `certification_id` int(11) NOT NULL AUTO_INCREMENT;
+
+--
+-- AUTO_INCREMENT for table `employee_assignments`
+--
+ALTER TABLE `employee_assignments`
+  MODIFY `assignment_id` int(11) NOT NULL AUTO_INCREMENT;
+
+--
+-- AUTO_INCREMENT for table `training_feedback`
+--
+ALTER TABLE `training_feedback`
+  MODIFY `feedback_id` int(11) NOT NULL AUTO_INCREMENT;
 
 --
 -- AUTO_INCREMENT for table `users`
@@ -3636,11 +4442,947 @@ ALTER TABLE `training_sessions`
   ADD CONSTRAINT `training_sessions_ibfk_2` FOREIGN KEY (`trainer_id`) REFERENCES `trainers` (`trainer_id`) ON DELETE CASCADE;
 
 --
+-- Constraints for table `certifications`
+--
+ALTER TABLE `certifications`
+  ADD CONSTRAINT `certifications_ibfk_1` FOREIGN KEY (`employee_id`) REFERENCES `employee_profiles` (`employee_id`) ON DELETE CASCADE,
+  ADD CONSTRAINT `certifications_ibfk_2` FOREIGN KEY (`skill_id`) REFERENCES `skill_matrix` (`skill_id`) ON DELETE SET NULL;
+
+--
+-- Constraints for table `employee_assignments`
+--
+ALTER TABLE `employee_assignments`
+  ADD CONSTRAINT `employee_assignments_ibfk_1` FOREIGN KEY (`employee_id`) REFERENCES `employee_profiles` (`employee_id`) ON DELETE CASCADE,
+  ADD CONSTRAINT `employee_assignments_ibfk_2` FOREIGN KEY (`session_id`) REFERENCES `training_sessions` (`session_id`) ON DELETE SET NULL,
+  ADD CONSTRAINT `employee_assignments_ibfk_3` FOREIGN KEY (`course_id`) REFERENCES `training_courses` (`course_id`) ON DELETE SET NULL,
+  ADD CONSTRAINT `employee_assignments_ibfk_4` FOREIGN KEY (`assigned_by_employee_id`) REFERENCES `employee_profiles` (`employee_id`) ON DELETE SET NULL,
+  ADD CONSTRAINT `employee_assignments_ibfk_5` FOREIGN KEY (`department_id`) REFERENCES `departments` (`department_id`) ON DELETE SET NULL;
+
+--
+-- Constraints for table `training_feedback`
+--
+ALTER TABLE `training_feedback`
+  ADD CONSTRAINT `training_feedback_ibfk_1` FOREIGN KEY (`employee_id`) REFERENCES `employee_profiles` (`employee_id`) ON DELETE CASCADE,
+  ADD CONSTRAINT `training_feedback_ibfk_2` FOREIGN KEY (`session_id`) REFERENCES `training_sessions` (`session_id`) ON DELETE SET NULL,
+  ADD CONSTRAINT `training_feedback_ibfk_3` FOREIGN KEY (`resource_id`) REFERENCES `learning_resources` (`resource_id`) ON DELETE SET NULL,
+  ADD CONSTRAINT `training_feedback_ibfk_4` FOREIGN KEY (`trainer_id`) REFERENCES `trainers` (`trainer_id`) ON DELETE SET NULL,
+  ADD CONSTRAINT `training_feedback_ibfk_5` FOREIGN KEY (`course_id`) REFERENCES `training_courses` (`course_id`) ON DELETE SET NULL;
+
+--
 -- Constraints for table `users`
 --
 ALTER TABLE `users`
   ADD CONSTRAINT `users_ibfk_1` FOREIGN KEY (`employee_id`) REFERENCES `employee_profiles` (`employee_id`) ON DELETE SET NULL;
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `salary_grades`
+--
+
+CREATE TABLE `salary_grades` (
+  `grade_id` int(11) NOT NULL AUTO_INCREMENT,
+  `grade_name` varchar(50) NOT NULL COMMENT 'e.g., SG-1, SG-15, SG-24',
+  `grade_level` int(11) NOT NULL COMMENT 'Numeric level for ordering',
+  `step_number` int(11) NOT NULL DEFAULT 1 COMMENT 'Step within the grade (1-8 typical in PH gov)',
+  `monthly_salary` decimal(10,2) NOT NULL,
+  `annual_salary` decimal(10,2) GENERATED ALWAYS AS (`monthly_salary` * 12) STORED,
+  `description` text DEFAULT NULL,
+  `effective_date` date NOT NULL,
+  `is_active` tinyint(1) DEFAULT 1,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
+  PRIMARY KEY (`grade_id`),
+  UNIQUE KEY `grade_step_unique` (`grade_level`, `step_number`, `effective_date`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+--
+-- Dumping data for table `salary_grades`
+--
+
+INSERT INTO `salary_grades` (`grade_name`, `grade_level`, `step_number`, `monthly_salary`, `description`, `effective_date`) VALUES
+('SG-1',  1,  1, 13000.00, 'Utility Worker, Laborer',                    '2024-01-01'),
+('SG-3',  3,  1, 15000.00, 'Driver, Security Personnel',                 '2024-01-01'),
+('SG-4',  4,  1, 16000.00, 'Maintenance Worker',                         '2024-01-01'),
+('SG-6',  6,  1, 18000.00, 'Clerk I, Utility Worker II',                 '2024-01-01'),
+('SG-8',  8,  1, 
+22000.00, 'Administrative Aide, Cashier I',             '2024-01-01'),
+('SG-10', 10, 1, 28000.00, 'Accounting Staff, Planning Staff',           '2024-01-01'),
+('SG-11', 11, 1, 30000.00, 'Clerk III, Collection Officer I',            '2024-01-01'),
+('SG-12', 12, 1, 33000.00, 'Cashier II, Collection Officer II',          '2024-01-01'),
+('SG-14', 14, 1, 38000.00, 'CAD Operator, Agricultural Technician',      '2024-01-01'),
+('SG-15', 15, 1, 40000.00, 'Sanitary Inspector, Midwife',                '2024-01-01'),
+('SG-16', 16, 1, 42000.00, 'Nurse, Social Worker',                       '2024-01-01'),
+('SG-18', 18, 1, 45000.00, 'Budget Analyst, Accounting Staff Senior',    '2024-01-01'),
+('SG-22', 22, 1, 55000.00, 'Department Head I (Treasurer, Engineer)',    '2024-01-01'),
+('SG-24', 24, 1, 65000.00, 'Department Head III',                        '2024-01-01'),
+('SG-25', 25, 1, 75000.00, 'Department Head IV (Senior Engineer)',       '2024-01-01');
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `salary_grade_history`
+--
+
+CREATE TABLE `salary_grade_history` (
+  `history_id` int(11) NOT NULL AUTO_INCREMENT,
+  `employee_id` int(11) NOT NULL,
+  `salary_grade_id` int(11) NOT NULL,
+  `previous_grade_id` int(11) DEFAULT NULL,
+  `effective_date` date NOT NULL,
+  `reason` varchar(255) DEFAULT NULL COMMENT 'e.g., Promotion, Step Increment, Salary Standardization',
+  `approved_by` int(11) DEFAULT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  PRIMARY KEY (`history_id`),
+  KEY `employee_id` (`employee_id`),
+  KEY `salary_grade_id` (`salary_grade_id`),
+  KEY `previous_grade_id` (`previous_grade_id`),
+  KEY `approved_by` (`approved_by`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+--
+-- Constraints for table `salary_grades`
+--
+
+ALTER TABLE `employment_history`
+  ADD COLUMN `salary_grade_id` int(11) DEFAULT NULL AFTER `department_id`,
+  ADD KEY `salary_grade_id` (`salary_grade_id`),
+  ADD CONSTRAINT `employment_history_salary_grade_fk`
+    FOREIGN KEY (`salary_grade_id`) REFERENCES `salary_grades` (`grade_id`) ON DELETE SET NULL;
+
+--
+-- Constraints for table `salary_grade_history`
+--
+
+ALTER TABLE `salary_grade_history`
+  ADD CONSTRAINT `sgh_employee_fk` FOREIGN KEY (`employee_id`) REFERENCES `employee_profiles` (`employee_id`) ON DELETE CASCADE,
+  ADD CONSTRAINT `sgh_grade_fk` FOREIGN KEY (`salary_grade_id`) REFERENCES `salary_grades` (`grade_id`) ON DELETE CASCADE,
+  ADD CONSTRAINT `sgh_prev_grade_fk` FOREIGN KEY (`previous_grade_id`) REFERENCES `salary_grades` (`grade_id`) ON DELETE SET NULL,
+  ADD CONSTRAINT `sgh_approved_by_fk` FOREIGN KEY (`approved_by`) REFERENCES `users` (`user_id`) ON DELETE SET NULL;
+
+--
+-- Mapping existing employees to their salary grades
+--
+
+UPDATE `employee_profiles` ep
+JOIN `salary_grades` sg ON sg.monthly_salary = ep.current_salary AND sg.is_active = 1
+SET ep.salary_grade_id = sg.grade_id;
+
+-- --------------------------------------------------------
+
+--
+-- View `employee_salary_overview`
+--
+
+CREATE VIEW `employee_salary_overview` AS
+SELECT
+  ep.employee_id,
+  ep.employee_number,
+  CONCAT(pi.first_name, ' ', pi.last_name) AS employee_name,
+  jr.title AS job_title,
+  sg.grade_name AS salary_grade,
+  sg.grade_level,
+  sg.step_number,
+  ep.current_salary AS monthly_salary,
+  sg.annual_salary,
+  sg.effective_date AS grade_effective_date
+FROM employee_profiles ep
+LEFT JOIN personal_information pi ON ep.personal_info_id = pi.personal_info_id
+LEFT JOIN job_roles jr ON ep.job_role_id = jr.job_role_id
+LEFT JOIN salary_grades sg ON ep.salary_grade_id = sg.grade_id;
+
+
+
+CREATE TABLE `reports` (
+  `report_id`           INT(11)       NOT NULL AUTO_INCREMENT,
+
+  -- ── Report Identity ─────────────────────────────────────
+  `report_code`         VARCHAR(30)   NOT NULL COMMENT 'Unique human-readable code, e.g. RPT-PAY-2025-001',
+  `report_type`         ENUM(
+                          'Payroll Summary',
+                          'Payroll Detail',
+                          'Performance Evaluation Summary',
+                          'Performance Competency Report',
+                          'Attendance Report',
+                          'Leave Request Summary',
+                          'Leave Balance Report',
+                          'Employee Information Report'
+                        ) NOT NULL,
+  `report_title`        VARCHAR(255)  NOT NULL,
+  `description`         TEXT          DEFAULT NULL,
+
+  -- ── Coverage / Scope ────────────────────────────────────
+  `report_period_start` DATE          NOT NULL  COMMENT 'Start of the period this report covers',
+  `report_period_end`   DATE          NOT NULL  COMMENT 'End of the period this report covers',
+  `department_id`       INT(11)       DEFAULT NULL COMMENT 'NULL = all departments',
+  `employee_id`         INT(11)       DEFAULT NULL COMMENT 'NULL = all employees in scope',
+
+  -- ── Payroll-specific metrics ─────────────────────────────
+  `total_employees_included`  INT(11)        DEFAULT NULL,
+  `total_gross_pay`           DECIMAL(14,2)  DEFAULT NULL,
+  `total_tax_deductions`      DECIMAL(14,2)  DEFAULT NULL,
+  `total_statutory_deductions`DECIMAL(14,2)  DEFAULT NULL,
+  `total_other_deductions`    DECIMAL(14,2)  DEFAULT NULL,
+  `total_net_pay`             DECIMAL(14,2)  DEFAULT NULL,
+  `payroll_cycle_id`          INT(11)        DEFAULT NULL,
+
+  -- ── Performance-specific metrics ────────────────────────
+  `cycle_id`                  INT(11)        DEFAULT NULL COMMENT 'References performance_review_cycles',
+  `average_overall_rating`    DECIMAL(4,2)   DEFAULT NULL COMMENT '0.00 – 5.00',
+  `total_reviews_submitted`   INT(11)        DEFAULT NULL,
+  `total_reviews_finalized`   INT(11)        DEFAULT NULL,
+  `highest_rating`            DECIMAL(4,2)   DEFAULT NULL,
+  `lowest_rating`             DECIMAL(4,2)   DEFAULT NULL,
+
+  -- ── Attendance-specific metrics ─────────────────────────
+  `total_present`             INT(11)        DEFAULT NULL,
+  `total_absent`              INT(11)        DEFAULT NULL,
+  `total_late`                INT(11)        DEFAULT NULL,
+  `total_on_leave`            INT(11)        DEFAULT NULL,
+  `total_working_hours`       DECIMAL(10,2)  DEFAULT NULL,
+  `total_overtime_hours`      DECIMAL(8,2)   DEFAULT NULL,
+  `attendance_rate_pct`       DECIMAL(5,2)   DEFAULT NULL COMMENT 'e.g. 95.30 means 95.30%',
+
+  -- ── Leave-specific metrics ───────────────────────────────
+  `total_leave_requests`      INT(11)        DEFAULT NULL,
+  `approved_leave_requests`   INT(11)        DEFAULT NULL,
+  `rejected_leave_requests`   INT(11)        DEFAULT NULL,
+  `pending_leave_requests`    INT(11)        DEFAULT NULL,
+  `total_leave_days_taken`    DECIMAL(7,2)   DEFAULT NULL,
+  `leave_type_breakdown`      LONGTEXT       CHARACTER SET utf8mb4
+                                             COLLATE utf8mb4_bin
+                                             DEFAULT NULL
+                                             COMMENT 'JSON: {"Vacation Leave":12,"Sick Leave":8,...}'
+                                             CHECK (json_valid(`leave_type_breakdown`)),
+
+  -- ── File & Status ────────────────────────────────────────
+  `report_status`       ENUM('Draft','Generated','Reviewed','Approved','Archived')
+                          NOT NULL DEFAULT 'Draft',
+  `file_path`           VARCHAR(500)  DEFAULT NULL COMMENT 'Generated PDF/XLSX path',
+  `file_format`         ENUM('PDF','Excel','CSV','HTML','N/A') DEFAULT 'PDF',
+
+  -- ── Audit Fields ─────────────────────────────────────────
+  `generated_by`        INT(11)       NOT NULL COMMENT 'user_id who created/generated the report',
+  `reviewed_by`         INT(11)       DEFAULT NULL,
+  `approved_by`         INT(11)       DEFAULT NULL,
+  `generated_at`        TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `reviewed_at`         TIMESTAMP     NULL DEFAULT NULL,
+  `approved_at`         TIMESTAMP     NULL DEFAULT NULL,
+  `notes`               TEXT          DEFAULT NULL,
+
+  `created_at`          TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `updated_at`          TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+
+  PRIMARY KEY (`report_id`),
+  UNIQUE KEY `report_code` (`report_code`),
+  KEY `fk_report_department`   (`department_id`),
+  KEY `fk_report_employee`     (`employee_id`),
+  KEY `fk_report_payroll_cycle`(`payroll_cycle_id`),
+  KEY `fk_report_perf_cycle`   (`cycle_id`),
+  KEY `fk_report_generated_by` (`generated_by`),
+  KEY `fk_report_reviewed_by`  (`reviewed_by`),
+  KEY `fk_report_approved_by`  (`approved_by`),
+  KEY `idx_report_type`        (`report_type`),
+  KEY `idx_report_period`      (`report_period_start`, `report_period_end`),
+  KEY `idx_report_status`      (`report_status`)
+
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci
+  COMMENT='Central reports table covering Payroll, Performance, Attendance, and Leave modules';
+
+-- ============================================================
+-- FOREIGN KEY CONSTRAINTS
+-- ============================================================
+
+ALTER TABLE `reports`
+  ADD CONSTRAINT `fk_report_department`
+    FOREIGN KEY (`department_id`)    REFERENCES `departments`              (`department_id`) ON DELETE SET NULL,
+  ADD CONSTRAINT `fk_report_employee`
+    FOREIGN KEY (`employee_id`)      REFERENCES `employee_profiles`        (`employee_id`)   ON DELETE SET NULL,
+  ADD CONSTRAINT `fk_report_payroll_cycle`
+    FOREIGN KEY (`payroll_cycle_id`) REFERENCES `payroll_cycles`           (`payroll_cycle_id`) ON DELETE SET NULL,
+  ADD CONSTRAINT `fk_report_perf_cycle`
+    FOREIGN KEY (`cycle_id`)         REFERENCES `performance_review_cycles`(`cycle_id`)     ON DELETE SET NULL,
+  ADD CONSTRAINT `fk_report_generated_by`
+    FOREIGN KEY (`generated_by`)     REFERENCES `users`                    (`user_id`)       ON DELETE RESTRICT,
+  ADD CONSTRAINT `fk_report_reviewed_by`
+    FOREIGN KEY (`reviewed_by`)      REFERENCES `users`                    (`user_id`)       ON DELETE SET NULL,
+  ADD CONSTRAINT `fk_report_approved_by`
+    FOREIGN KEY (`approved_by`)      REFERENCES `users`                    (`user_id`)       ON DELETE SET NULL;
+
+-- ============================================================
+-- SAMPLE DATA  (accurate values derived from existing DB rows)
+-- ============================================================
+
+INSERT INTO `reports` (
+  `report_code`, `report_type`, `report_title`, `description`,
+  `report_period_start`, `report_period_end`,
+  `department_id`, `employee_id`,
+
+  -- payroll columns
+  `total_employees_included`,
+  `total_gross_pay`, `total_tax_deductions`,
+  `total_statutory_deductions`, `total_other_deductions`, `total_net_pay`,
+  `payroll_cycle_id`,
+
+  -- performance columns
+  `cycle_id`, `average_overall_rating`,
+  `total_reviews_submitted`, `total_reviews_finalized`,
+  `highest_rating`, `lowest_rating`,
+
+  -- attendance columns
+  `total_present`, `total_absent`, `total_late`, `total_on_leave`,
+  `total_working_hours`, `total_overtime_hours`, `attendance_rate_pct`,
+
+  -- leave columns
+  `total_leave_requests`, `approved_leave_requests`,
+  `rejected_leave_requests`, `pending_leave_requests`,
+  `total_leave_days_taken`, `leave_type_breakdown`,
+
+  -- file / status / audit
+  `report_status`, `file_path`, `file_format`,
+  `generated_by`, `reviewed_by`, `approved_by`,
+  `generated_at`, `reviewed_at`, `approved_at`,
+  `notes`
+)
+VALUES
+
+(
+  'RPT-PAY-2025-01',
+  'Payroll Summary',
+  'January 2025 Payroll Summary Report – All Departments',
+  'Monthly payroll summary covering all 15 active employees across all municipal departments for January 2025.',
+  '2025-01-01', '2025-01-31',
+  NULL, NULL,
+  -- payroll
+  15, 569000.00, 56900.00, 28450.00, 5690.00, 477960.00,
+  NULL,
+  -- performance
+  NULL, NULL, NULL, NULL, NULL, NULL,
+  -- attendance
+  NULL, NULL, NULL, NULL, NULL, NULL, NULL,
+  -- leave
+  NULL, NULL, NULL, NULL, NULL, NULL,
+  -- status
+  'Approved',
+  '/reports/payroll/RPT-PAY-2025-01.pdf', 'PDF',
+  2, 1, 1,
+  '2025-02-01 08:00:00', '2025-02-03 10:00:00', '2025-02-05 09:00:00',
+  'All 15 employees processed. No disputes raised.'
+),
+
+(
+  'RPT-PAY-2025-07-D03',
+  'Payroll Detail',
+  'July 2025 Payroll Detail – Municipal Treasurer\'s Office',
+  'Detailed payroll breakdown for Department 3 (Municipal Treasurer\'s Office) covering employees Maria Santos, Sandra Pascual, and Jose Ramos.',
+  '2025-07-01', '2025-07-31',
+  3, NULL,
+  -- payroll
+  3, 103000.00, 10300.00, 5150.00, 1030.00, 86520.00,
+  NULL,
+  -- performance
+  NULL, NULL, NULL, NULL, NULL, NULL,
+  -- attendance
+  NULL, NULL, NULL, NULL, NULL, NULL, NULL,
+  -- leave
+  NULL, NULL, NULL, NULL, NULL, NULL,
+  -- status
+  'Approved',
+  '/reports/payroll/RPT-PAY-2025-07-D03.pdf', 'PDF',
+  2, 1, 1,
+  '2025-08-01 08:30:00', '2025-08-02 11:00:00', '2025-08-04 14:00:00',
+  'Sandra Pascual had 1 approved leave day deducted. Final net verified.'
+),
+
+-- ─────────────────────────────────────────────────────────
+-- 3. PAYROLL SUMMARY – All Departments, Q3 2025 (Jul–Sep)
+--    3-month aggregate for 15 employees
+-- ─────────────────────────────────────────────────────────
+(
+  'RPT-PAY-2025-Q3',
+  'Payroll Summary',
+  'Q3 2025 Payroll Summary Report (July – September)',
+  'Quarterly payroll summary for Q3 2025 covering all active municipal employees.',
+  '2025-07-01', '2025-09-30',
+  NULL, NULL,
+  -- payroll
+  15, 1707000.00, 170700.00, 85350.00, 17070.00, 1433880.00,
+  NULL,
+  -- performance
+  NULL, NULL, NULL, NULL, NULL, NULL,
+  -- attendance
+  NULL, NULL, NULL, NULL, NULL, NULL, NULL,
+  -- leave
+  NULL, NULL, NULL, NULL, NULL, NULL,
+  -- status
+  'Approved',
+  '/reports/payroll/RPT-PAY-2025-Q3.xlsx', 'Excel',
+  1, 2, 1,
+  '2025-10-03 09:00:00', '2025-10-05 14:00:00', '2025-10-07 10:00:00',
+  'Includes bonus payment records from bonus_payments table. No anomalies detected.'
+),
+
+-- ─────────────────────────────────────────────────────────
+-- 4. PERFORMANCE EVALUATION SUMMARY – Monthly Cycle (cycle_id=3)
+--    cycle_id=3 = "Monthly Evaluation" Oct 2025
+--    Actual competency data: Roberto Cruz avg ~3.0, Carmen ~4.5, Ana ~3.0
+-- ─────────────────────────────────────────────────────────
+(
+  'RPT-PERF-2025-10',
+  'Performance Evaluation Summary',
+  'October 2025 Monthly Performance Evaluation Summary',
+  'Summary of performance evaluations submitted during the Monthly Evaluation cycle (Oct 2025). Based on competency assessments for all participating employees.',
+  '2025-10-01', '2025-10-31',
+  NULL, NULL,
+  -- payroll
+  NULL, NULL, NULL, NULL, NULL, NULL, NULL,
+  -- performance
+  3, 3.58, 7, 5, 4.50, 2.00,
+  -- attendance
+  NULL, NULL, NULL, NULL, NULL, NULL, NULL,
+  -- leave
+  NULL, NULL, NULL, NULL, NULL, NULL,
+  -- status
+  'Reviewed',
+  '/reports/performance/RPT-PERF-2025-10.pdf', 'PDF',
+  2, 1, NULL,
+  '2025-11-03 08:00:00', '2025-11-04 10:00:00', NULL,
+  'Employee ID 2 (Roberto Cruz) had 3 competencies assessed: Infrastructure Design (3), Construction Oversight (2), Problem Solving (4). Employee ID 7 (Carmen Dela Cruz) scored highest at 5 and 4. Awaiting final approval.'
+),
+
+-- ─────────────────────────────────────────────────────────
+-- 5. PERFORMANCE COMPETENCY REPORT – Municipal Engineer's Office, Cycle 3
+--    Dept 7: Roberto Cruz competencies rated
+-- ─────────────────────────────────────────────────────────
+(
+  'RPT-COMP-2025-10-D07',
+  'Performance Competency Report',
+  'October 2025 Competency Assessment – Municipal Engineer\'s Office',
+  'Detailed competency-level performance report for the Municipal Engineer\'s Office. Covers Infrastructure Design, Construction Oversight, and Problem Solving ratings for Roberto Cruz (Employee #MUN002).',
+  '2025-10-01', '2025-10-31',
+  7, 2,
+  -- payroll
+  NULL, NULL, NULL, NULL, NULL, NULL, NULL,
+  -- performance
+  3, 3.00, 3, 3, 4.00, 2.00,
+  -- attendance
+  NULL, NULL, NULL, NULL, NULL, NULL, NULL,
+  -- leave
+  NULL, NULL, NULL, NULL, NULL, NULL,
+  -- status
+  'Generated',
+  '/reports/performance/RPT-COMP-2025-10-D07.pdf', 'PDF',
+  2, NULL, NULL,
+  '2025-11-01 07:45:00', NULL, NULL,
+  'Infrastructure Design: 3 (Nice Improvement). Construction Oversight: 2 (Attend Seminar & Training). Problem Solving: 4 (Excellent). Recommend targeted training for Construction Oversight.'
+),
+
+-- ─────────────────────────────────────────────────────────
+-- 6. PERFORMANCE EVALUATION SUMMARY – Yearly Cycle (cycle_id=4)
+--    cycle_id=4 = "Yearly Evaluation" 2026
+--    Ana Morales (emp 11): Bookkeeping 3 (nice), Data Accuracy 3 (amazing)
+-- ─────────────────────────────────────────────────────────
+(
+  'RPT-PERF-2026-ANNUAL',
+  'Performance Evaluation Summary',
+  '2026 Annual Performance Evaluation Summary – All Departments',
+  'Organisation-wide annual performance evaluation summary for the 2026 cycle. Includes competency ratings for all employees evaluated under the Yearly Evaluation cycle.',
+  '2026-01-01', '2026-12-31',
+  NULL, NULL,
+  -- payroll
+  NULL, NULL, NULL, NULL, NULL, NULL, NULL,
+  -- performance
+  4, 3.00, 2, 0, 3.00, 3.00,
+  -- attendance
+  NULL, NULL, NULL, NULL, NULL, NULL, NULL,
+  -- leave
+  NULL, NULL, NULL, NULL, NULL, NULL,
+  -- status
+  'Draft',
+  NULL, 'N/A',
+  2, NULL, NULL,
+  '2026-01-27 02:30:00', NULL, NULL,
+  'Cycle in progress. Only Ana Morales (emp 11) evaluated so far: Bookkeeping 3, Data Accuracy 3. More evaluations pending.'
+),
+
+-- ─────────────────────────────────────────────────────────
+-- 7. ATTENDANCE REPORT – All Departments, January 2024
+--    Derived from leave_balances 2024 data and employee shifts
+-- ─────────────────────────────────────────────────────────
+(
+  'RPT-ATT-2024-01',
+  'Attendance Report',
+  'January 2024 Attendance Report – All Departments',
+  'Monthly attendance report for January 2024 covering all active employees. Metrics derived from clock-in/out records and leave data.',
+  '2024-01-01', '2024-01-31',
+  NULL, NULL,
+  -- payroll
+  NULL, NULL, NULL, NULL, NULL, NULL, NULL,
+  -- performance
+  NULL, NULL, NULL, NULL, NULL, NULL,
+  -- attendance (23 working days × 15 employees = 345 possible days)
+  310, 15, 20, 20,
+  2480.00, 32.00, 89.86,
+  -- leave
+  NULL, NULL, NULL, NULL, NULL, NULL,
+  -- status
+  'Approved',
+  '/reports/attendance/RPT-ATT-2024-01.pdf', 'PDF',
+  2, 1, 1,
+  '2024-02-02 08:00:00', '2024-02-03 09:00:00', '2024-02-05 11:00:00',
+  'Employee #MUN004 (Antonio Garcia) recorded highest late arrivals (7 instances). Employee #MUN002 (Roberto Cruz) logged overtime on 4 days.'
+),
+
+-- ─────────────────────────────────────────────────────────
+-- 8. ATTENDANCE REPORT – Municipal Health Office, Q1 2024
+--    Dept 9: employees 3 (Jennifer Reyes), 13 (Grace Lopez)
+-- ─────────────────────────────────────────────────────────
+(
+  'RPT-ATT-2024-Q1-D09',
+  'Attendance Report',
+  'Q1 2024 Attendance Report – Municipal Health Office',
+  'Quarterly attendance report for Q1 2024 (January–March) for the Municipal Health Office. Covers Nurse Jennifer Reyes and Midwife Grace Lopez.',
+  '2024-01-01', '2024-03-31',
+  9, NULL,
+  -- payroll
+  NULL, NULL, NULL, NULL, NULL, NULL, NULL,
+  -- performance
+  NULL, NULL, NULL, NULL, NULL, NULL,
+  -- attendance (65 working days × 2 employees = 130 possible)
+  118, 4, 8, 10,
+  944.00, 8.00, 90.77,
+  -- leave
+  NULL, NULL, NULL, NULL, NULL, NULL,
+  -- status
+  'Approved',
+  '/reports/attendance/RPT-ATT-2024-Q1-D09.pdf', 'PDF',
+  2, 1, 1,
+  '2024-04-03 09:00:00', '2024-04-04 10:00:00', '2024-04-07 14:30:00',
+  'Grace Lopez used 10 days of Maternity Leave in March 2024 (balance: 60 remaining).'
+),
+
+-- ─────────────────────────────────────────────────────────
+-- 9. LEAVE REQUEST SUMMARY – All Departments, 2024
+--    From leave_balances: employees 1–5 have VL + SL data
+--    Total leaves taken: 3+5+2+7+4 (VL) + 1+3+0+2+1 (SL) = 28 leave days
+-- ─────────────────────────────────────────────────────────
+(
+  'RPT-LVE-2024-ANNUAL',
+  'Leave Request Summary',
+  '2024 Annual Leave Request Summary – All Departments',
+  'Full-year 2024 leave request summary for all employees. Includes breakdown by leave type (Vacation, Sick, Maternity, Paternity, Emergency, Solo Parent, Menstrual Disorder).',
+  '2024-01-01', '2024-12-31',
+  NULL, NULL,
+  -- payroll
+  NULL, NULL, NULL, NULL, NULL, NULL, NULL,
+  -- performance
+  NULL, NULL, NULL, NULL, NULL, NULL,
+  -- attendance
+  NULL, NULL, NULL, NULL, NULL, NULL, NULL,
+  -- leave (derived from leave_balances 2024 rows for employees 1-5)
+  38, 32, 3, 3,
+  28.00,
+  '{"Vacation Leave": 21, "Sick Leave": 7, "Maternity Leave": 0, "Paternity Leave": 0, "Emergency Leave": 0}',
+  -- status
+  'Approved',
+  '/reports/leave/RPT-LVE-2024-ANNUAL.xlsx', 'Excel',
+  2, 1, 1,
+  '2025-01-05 08:00:00', '2025-01-07 10:00:00', '2025-01-09 09:00:00',
+  'Employees 1–5 recorded. Remaining employees had zero leave requests in 2024. Full data pending for employees 6–15.'
+),
+
+-- ─────────────────────────────────────────────────────────
+-- 10. LEAVE BALANCE REPORT – All Departments, Year 2024
+--     Snapshot of remaining balances from leave_balances table
+-- ─────────────────────────────────────────────────────────
+(
+  'RPT-LVBAL-2024',
+  'Leave Balance Report',
+  '2024 End-of-Year Leave Balance Report – All Departments',
+  'End-of-year leave balance snapshot for 2024. Shows remaining Vacation Leave, Sick Leave, Maternity, and Paternity balances per employee as of December 31, 2024.',
+  '2024-01-01', '2024-12-31',
+  NULL, NULL,
+  -- payroll
+  NULL, NULL, NULL, NULL, NULL, NULL, NULL,
+  -- performance
+  NULL, NULL, NULL, NULL, NULL, NULL,
+  -- attendance
+  NULL, NULL, NULL, NULL, NULL, NULL, NULL,
+  -- leave (totals from leave_balances: VL remaining 12+9+13+8+9=51, SL remaining 9+7+10+8+9=43)
+  NULL, NULL, NULL, NULL,
+  28.00,
+  '{"Vacation Leave": {"total_allocated": 75, "total_taken": 21, "total_remaining": 51}, "Sick Leave": {"total_allocated": 50, "total_taken": 7, "total_remaining": 43}, "Maternity Leave": {"total_allocated": 180, "total_taken": 0, "total_remaining": 180}, "Paternity Leave": {"total_allocated": 21, "total_taken": 0, "total_remaining": 21}}',
+  -- status
+  'Approved',
+  '/reports/leave/RPT-LVBAL-2024.pdf', 'PDF',
+  2, 1, 1,
+  '2025-01-02 07:30:00', '2025-01-03 09:00:00', '2025-01-06 10:00:00',
+  'Based on leave_balances records for employees 1–5 in year 2024. Carry-forward of up to 5 days VL/SL per RA 10911 applies. Reported to HR Director for FY closing.'
+),
+
+-- ─────────────────────────────────────────────────────────
+-- 11. EMPLOYEE INFORMATION REPORT – All Employees, Jan 2026
+-- ─────────────────────────────────────────────────────────
+(
+  'RPT-EMP-2026-01',
+  'Employee Information Report',
+  'January 2026 Employee Information Masterlist',
+  'Comprehensive employee information report listing all active employees, their job roles, departments, hire dates, employment status, and current salary grades as of January 2026.',
+  '2026-01-01', '2026-01-31',
+  NULL, NULL,
+  -- payroll
+  15, 570000.00, NULL, NULL, NULL, NULL, NULL,
+  -- performance
+  NULL, NULL, NULL, NULL, NULL, NULL,
+  -- attendance
+  NULL, NULL, NULL, NULL, NULL, NULL, NULL,
+  -- leave
+  NULL, NULL, NULL, NULL, NULL, NULL,
+  -- status
+  'Approved',
+  '/reports/employee/RPT-EMP-2026-01.xlsx', 'Excel',
+  2, 1, 1,
+  '2026-01-20 06:00:00', '2026-01-21 10:00:00', '2026-01-22 14:00:00',
+  'Includes 15 active employees (MUN001–MUN015). Archived employees (Pedro Santos MUN016, Ramon Reyes MUN017) excluded. Data sourced from employee_profiles, personal_information, job_roles, salary_grades.'
+),
+
+-- ─────────────────────────────────────────────────────────
+-- 12. LEAVE REQUEST SUMMARY – Municipal Health Office, H1 2025
+--     Dept 9: Jennifer Reyes (VL: 2 taken, SL: 0 taken) + Grace Lopez
+-- ─────────────────────────────────────────────────────────
+(
+  'RPT-LVE-2025-H1-D09',
+  'Leave Request Summary',
+  'H1 2025 Leave Request Summary – Municipal Health Office',
+  'Leave request summary for the first half of 2025 (January–June) for the Municipal Health Office (Department 9). Covers Nurse Jennifer Reyes and Midwife Grace Lopez.',
+  '2025-01-01', '2025-06-30',
+  9, NULL,
+  -- payroll
+  NULL, NULL, NULL, NULL, NULL, NULL, NULL,
+  -- performance
+  NULL, NULL, NULL, NULL, NULL, NULL,
+  -- attendance
+  NULL, NULL, NULL, NULL, NULL, NULL, NULL,
+  -- leave
+  5, 4, 0, 1,
+  4.00,
+  '{"Vacation Leave": 2, "Sick Leave": 2}',
+  -- status
+  'Reviewed',
+  '/reports/leave/RPT-LVE-2025-H1-D09.pdf', 'PDF',
+  2, 1, NULL,
+  '2025-07-03 08:00:00', '2025-07-05 09:00:00', NULL,
+  'Grace Lopez: midwifery license expires 2025-09-30 (ref document_management). Reminder included in notes for renewal. 1 leave request pending supervisor action.'
+);
+
+
+ALTER TABLE `reports`
+  MODIFY `report_id` INT(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=13;
+
+-- ============================================================
+-- 1. ADD 'DTR Report' TO THE report_type ENUM
+-- ============================================================
+
+ALTER TABLE `reports`
+  MODIFY COLUMN `report_type` ENUM(
+    'Payroll Summary',
+    'Payroll Detail',
+    'Performance Evaluation Summary',
+    'Performance Competency Report',
+    'Attendance Report',
+    'Leave Request Summary',
+    'Leave Balance Report',
+    'Employee Information Report',
+    'DTR Report'                      -- ← NEW
+  ) NOT NULL;
+
+
+-- ============================================================
+-- 2. ADD DTR-SPECIFIC COLUMNS
+-- ============================================================
+
+ALTER TABLE `reports`
+  ADD COLUMN `dtr_employee_id`        INT(11)       DEFAULT NULL
+    COMMENT 'Employee this DTR belongs to (NULL = batch/department DTR)'
+    AFTER `total_on_leave`,
+
+  ADD COLUMN `dtr_total_days_worked`  INT(11)       DEFAULT NULL
+    COMMENT 'Total days the employee was present'
+    AFTER `dtr_employee_id`,
+
+  ADD COLUMN `dtr_total_days_absent`  INT(11)       DEFAULT NULL
+    COMMENT 'Total days absent within the DTR period'
+    AFTER `dtr_total_days_worked`,
+
+  ADD COLUMN `dtr_total_late_minutes` DECIMAL(8,2)  DEFAULT NULL
+    COMMENT 'Total accumulated late minutes in the period'
+    AFTER `dtr_total_days_absent`,
+
+  ADD COLUMN `dtr_total_undertime_minutes` DECIMAL(8,2) DEFAULT NULL
+    COMMENT 'Total accumulated undertime minutes in the period'
+    AFTER `dtr_total_late_minutes`,
+
+  ADD COLUMN `dtr_total_overtime_hours`    DECIMAL(8,2) DEFAULT NULL
+    COMMENT 'Total overtime hours rendered'
+    AFTER `dtr_total_undertime_minutes`,
+
+  ADD COLUMN `dtr_total_working_hours`     DECIMAL(10,2) DEFAULT NULL
+    COMMENT 'Total actual hours worked in the period'
+    AFTER `dtr_total_overtime_hours`,
+
+  ADD COLUMN `dtr_daily_records`      LONGTEXT
+    CHARACTER SET utf8mb4
+    COLLATE utf8mb4_bin
+    DEFAULT NULL
+    COMMENT 'JSON array – one entry per day: [{date, day_of_week, clock_in, clock_out, working_hours, overtime_hours, late_minutes, undertime_minutes, status, notes}]'
+    AFTER `dtr_total_working_hours`,
+
+  ADD COLUMN `dtr_certification_officer` VARCHAR(150) DEFAULT NULL
+    COMMENT 'Name/position of the officer certifying the DTR'
+    AFTER `dtr_daily_records`,
+
+  ADD COLUMN `dtr_supervisor_name`    VARCHAR(150) DEFAULT NULL
+    COMMENT 'Immediate supervisor who verified the DTR'
+    AFTER `dtr_certification_officer`,
+
+  ADD COLUMN `dtr_is_certified`       TINYINT(1)   DEFAULT 0
+    COMMENT '1 = DTR has been certified/signed off'
+    AFTER `dtr_supervisor_name`,
+
+  ADD COLUMN `dtr_certified_at`       TIMESTAMP    NULL DEFAULT NULL
+    COMMENT 'When the DTR was certified'
+    AFTER `dtr_is_certified`,
+
+  ADD KEY `fk_report_dtr_employee` (`dtr_employee_id`);
+
+-- Foreign key for dtr_employee_id
+ALTER TABLE `reports`
+  ADD CONSTRAINT `fk_report_dtr_employee`
+    FOREIGN KEY (`dtr_employee_id`)
+    REFERENCES `employee_profiles` (`employee_id`)
+    ON DELETE SET NULL;
+
+
+-- ============================================================
+-- 3. SAMPLE DATA – DTR Reports
+-- ============================================================
+
+INSERT INTO `reports` (
+  `report_code`, `report_type`, `report_title`, `description`,
+  `report_period_start`, `report_period_end`,
+  `department_id`, `employee_id`,
+
+  -- payroll / performance / attendance / leave (all NULL for DTR)
+  `total_employees_included`,
+  `total_gross_pay`, `total_tax_deductions`,
+  `total_statutory_deductions`, `total_other_deductions`, `total_net_pay`,
+  `payroll_cycle_id`,
+  `cycle_id`, `average_overall_rating`,
+  `total_reviews_submitted`, `total_reviews_finalized`,
+  `highest_rating`, `lowest_rating`,
+  `total_present`, `total_absent`, `total_late`, `total_on_leave`,
+  `total_working_hours`, `total_overtime_hours`, `attendance_rate_pct`,
+  `total_leave_requests`, `approved_leave_requests`,
+  `rejected_leave_requests`, `pending_leave_requests`,
+  `total_leave_days_taken`, `leave_type_breakdown`,
+
+  -- DTR-specific
+  `dtr_employee_id`,
+  `dtr_total_days_worked`,
+  `dtr_total_days_absent`,
+  `dtr_total_late_minutes`,
+  `dtr_total_undertime_minutes`,
+  `dtr_total_overtime_hours`,
+  `dtr_total_working_hours`,
+  `dtr_daily_records`,
+  `dtr_certification_officer`,
+  `dtr_supervisor_name`,
+  `dtr_is_certified`,
+  `dtr_certified_at`,
+
+  -- file / status / audit
+  `report_status`, `file_path`, `file_format`,
+  `generated_by`, `reviewed_by`, `approved_by`,
+  `generated_at`, `reviewed_at`, `approved_at`,
+  `notes`
+)
+VALUES
+
+-- ─────────────────────────────────────────────────────────
+-- DTR Sample 1: Maria Santos (MUN001) – January 2026
+--   Municipal Treasurer, Full-time, Dept 3
+--   22 working days, 0 absent, 2 late days (20+15 min),
+--   4 overtime days (2h each), 0 undertime
+-- ─────────────────────────────────────────────────────────
+(
+  'RPT-DTR-2026-01-EMP001',
+  'DTR Report',
+  'January 2026 Daily Time Record – Maria Santos (MUN001)',
+  'Official Daily Time Record for Municipal Treasurer Maria Santos covering the full month of January 2026. Records all clock-in/clock-out times, late arrivals, and overtime hours.',
+  '2026-01-01', '2026-01-31',
+  3, 1,
+  NULL, NULL, NULL, NULL, NULL, NULL, NULL,
+  NULL, NULL, NULL, NULL, NULL, NULL,
+  NULL, NULL, NULL, NULL, NULL, NULL, NULL,
+  NULL, NULL, NULL, NULL, NULL, NULL,
+  -- DTR
+  1,
+  22, 0, 35.00, 0.00, 8.00, 176.00,
+  '[
+    {"date":"2026-01-02","day_of_week":"Friday",   "clock_in":"07:55:00","clock_out":"17:05:00","working_hours":8.17,"overtime_hours":1.08,"late_minutes":0,"undertime_minutes":0,"status":"Present","notes":""},
+    {"date":"2026-01-05","day_of_week":"Monday",   "clock_in":"08:20:00","clock_out":"17:00:00","working_hours":8.00,"overtime_hours":0,"late_minutes":20,"undertime_minutes":0,"status":"Late","notes":""},
+    {"date":"2026-01-06","day_of_week":"Tuesday",  "clock_in":"08:00:00","clock_out":"17:00:00","working_hours":8.00,"overtime_hours":0,"late_minutes":0,"undertime_minutes":0,"status":"Present","notes":""},
+    {"date":"2026-01-07","day_of_week":"Wednesday","clock_in":"08:00:00","clock_out":"17:00:00","working_hours":8.00,"overtime_hours":0,"late_minutes":0,"undertime_minutes":0,"status":"Present","notes":""},
+    {"date":"2026-01-08","day_of_week":"Thursday", "clock_in":"08:00:00","clock_out":"17:00:00","working_hours":8.00,"overtime_hours":0,"late_minutes":0,"undertime_minutes":0,"status":"Present","notes":""},
+    {"date":"2026-01-09","day_of_week":"Friday",   "clock_in":"08:00:00","clock_out":"19:00:00","working_hours":8.00,"overtime_hours":2.00,"late_minutes":0,"undertime_minutes":0,"status":"Present","notes":"Budget deadline overtime"},
+    {"date":"2026-01-12","day_of_week":"Monday",   "clock_in":"08:00:00","clock_out":"17:00:00","working_hours":8.00,"overtime_hours":0,"late_minutes":0,"undertime_minutes":0,"status":"Present","notes":""},
+    {"date":"2026-01-13","day_of_week":"Tuesday",  "clock_in":"08:00:00","clock_out":"17:00:00","working_hours":8.00,"overtime_hours":0,"late_minutes":0,"undertime_minutes":0,"status":"Present","notes":""},
+    {"date":"2026-01-14","day_of_week":"Wednesday","clock_in":"08:15:00","clock_out":"17:00:00","working_hours":8.00,"overtime_hours":0,"late_minutes":15,"undertime_minutes":0,"status":"Late","notes":""},
+    {"date":"2026-01-15","day_of_week":"Thursday", "clock_in":"08:00:00","clock_out":"17:00:00","working_hours":8.00,"overtime_hours":0,"late_minutes":0,"undertime_minutes":0,"status":"Present","notes":""},
+    {"date":"2026-01-16","day_of_week":"Friday",   "clock_in":"08:00:00","clock_out":"19:00:00","working_hours":8.00,"overtime_hours":2.00,"late_minutes":0,"undertime_minutes":0,"status":"Present","notes":"Year-end reconciliation overtime"},
+    {"date":"2026-01-19","day_of_week":"Monday",   "clock_in":"08:00:00","clock_out":"17:00:00","working_hours":8.00,"overtime_hours":0,"late_minutes":0,"undertime_minutes":0,"status":"Present","notes":""},
+    {"date":"2026-01-20","day_of_week":"Tuesday",  "clock_in":"08:00:00","clock_out":"17:00:00","working_hours":8.00,"overtime_hours":0,"late_minutes":0,"undertime_minutes":0,"status":"Present","notes":""},
+    {"date":"2026-01-21","day_of_week":"Wednesday","clock_in":"08:00:00","clock_out":"17:00:00","working_hours":8.00,"overtime_hours":0,"late_minutes":0,"undertime_minutes":0,"status":"Present","notes":""},
+    {"date":"2026-01-22","day_of_week":"Thursday", "clock_in":"08:00:00","clock_out":"17:00:00","working_hours":8.00,"overtime_hours":0,"late_minutes":0,"undertime_minutes":0,"status":"Present","notes":""},
+    {"date":"2026-01-23","day_of_week":"Friday",   "clock_in":"08:00:00","clock_out":"19:00:00","working_hours":8.00,"overtime_hours":2.00,"late_minutes":0,"undertime_minutes":0,"status":"Present","notes":"Treasury audit overtime"},
+    {"date":"2026-01-26","day_of_week":"Monday",   "clock_in":"08:00:00","clock_out":"17:00:00","working_hours":8.00,"overtime_hours":0,"late_minutes":0,"undertime_minutes":0,"status":"Present","notes":""},
+    {"date":"2026-01-27","day_of_week":"Tuesday",  "clock_in":"08:00:00","clock_out":"17:00:00","working_hours":8.00,"overtime_hours":0,"late_minutes":0,"undertime_minutes":0,"status":"Present","notes":""},
+    {"date":"2026-01-28","day_of_week":"Wednesday","clock_in":"08:00:00","clock_out":"17:00:00","working_hours":8.00,"overtime_hours":0,"late_minutes":0,"undertime_minutes":0,"status":"Present","notes":""},
+    {"date":"2026-01-29","day_of_week":"Thursday", "clock_in":"08:00:00","clock_out":"17:00:00","working_hours":8.00,"overtime_hours":0,"late_minutes":0,"undertime_minutes":0,"status":"Present","notes":""},
+    {"date":"2026-01-30","day_of_week":"Friday",   "clock_in":"08:00:00","clock_out":"19:00:00","working_hours":8.00,"overtime_hours":2.00,"late_minutes":0,"undertime_minutes":0,"status":"Present","notes":"Month-end closing overtime"}
+  ]',
+  'Municipal HR Officer',
+  'Roberto Cruz – Municipal Engineer (Dept Head)',
+  1,
+  '2026-02-02 08:30:00',
+  'Approved',
+  '/reports/dtr/RPT-DTR-2026-01-EMP001.pdf', 'PDF',
+  2, 1, 1,
+  '2026-02-01 07:00:00', '2026-02-02 09:00:00', '2026-02-03 10:00:00',
+  'DTR verified against biometric logs. 35 minutes late total spread across 2 days. 8 overtime hours approved by department head. No absences recorded.'
+),
+
+-- ─────────────────────────────────────────────────────────
+-- DTR Sample 2: Roberto Cruz (MUN002) – January 2026
+--   Municipal Engineer, Dept 7
+--   20 working days, 1 absent (sick), 1 late, 6 overtime hours
+-- ─────────────────────────────────────────────────────────
+(
+  'RPT-DTR-2026-01-EMP002',
+  'DTR Report',
+  'January 2026 Daily Time Record – Roberto Cruz (MUN002)',
+  'Official Daily Time Record for Municipal Engineer Roberto Cruz for January 2026. Includes one sick absence and field work overtime entries.',
+  '2026-01-01', '2026-01-31',
+  7, 2,
+  NULL, NULL, NULL, NULL, NULL, NULL, NULL,
+  NULL, NULL, NULL, NULL, NULL, NULL,
+  NULL, NULL, NULL, NULL, NULL, NULL, NULL,
+  NULL, NULL, NULL, NULL, NULL, NULL,
+  -- DTR
+  2,
+  20, 1, 25.00, 0.00, 6.00, 160.00,
+  '[
+    {"date":"2026-01-02","day_of_week":"Friday",   "clock_in":"08:00:00","clock_out":"17:00:00","working_hours":8.00,"overtime_hours":0,"late_minutes":0,"undertime_minutes":0,"status":"Present","notes":""},
+    {"date":"2026-01-05","day_of_week":"Monday",   "clock_in":"08:00:00","clock_out":"17:00:00","working_hours":8.00,"overtime_hours":0,"late_minutes":0,"undertime_minutes":0,"status":"Present","notes":""},
+    {"date":"2026-01-06","day_of_week":"Tuesday",  "clock_in":"08:00:00","clock_out":"17:00:00","working_hours":8.00,"overtime_hours":0,"late_minutes":0,"undertime_minutes":0,"status":"Present","notes":""},
+    {"date":"2026-01-07","day_of_week":"Wednesday","clock_in":"08:25:00","clock_out":"17:00:00","working_hours":8.00,"overtime_hours":0,"late_minutes":25,"undertime_minutes":0,"status":"Late","notes":"Traffic delay"},
+    {"date":"2026-01-08","day_of_week":"Thursday", "clock_in":"08:00:00","clock_out":"17:00:00","working_hours":8.00,"overtime_hours":0,"late_minutes":0,"undertime_minutes":0,"status":"Present","notes":""},
+    {"date":"2026-01-09","day_of_week":"Friday",   "clock_in":"08:00:00","clock_out":"20:00:00","working_hours":8.00,"overtime_hours":3.00,"late_minutes":0,"undertime_minutes":0,"status":"Present","notes":"Infrastructure site inspection overtime"},
+    {"date":"2026-01-12","day_of_week":"Monday",   "clock_in":null,      "clock_out":null,      "working_hours":0,   "overtime_hours":0,"late_minutes":0,"undertime_minutes":0,"status":"Absent","notes":"Sick leave – medical certificate submitted"},
+    {"date":"2026-01-13","day_of_week":"Tuesday",  "clock_in":"08:00:00","clock_out":"17:00:00","working_hours":8.00,"overtime_hours":0,"late_minutes":0,"undertime_minutes":0,"status":"Present","notes":""},
+    {"date":"2026-01-14","day_of_week":"Wednesday","clock_in":"08:00:00","clock_out":"17:00:00","working_hours":8.00,"overtime_hours":0,"late_minutes":0,"undertime_minutes":0,"status":"Present","notes":""},
+    {"date":"2026-01-15","day_of_week":"Thursday", "clock_in":"08:00:00","clock_out":"17:00:00","working_hours":8.00,"overtime_hours":0,"late_minutes":0,"undertime_minutes":0,"status":"Present","notes":""},
+    {"date":"2026-01-16","day_of_week":"Friday",   "clock_in":"08:00:00","clock_out":"17:00:00","working_hours":8.00,"overtime_hours":0,"late_minutes":0,"undertime_minutes":0,"status":"Present","notes":""},
+    {"date":"2026-01-19","day_of_week":"Monday",   "clock_in":"08:00:00","clock_out":"17:00:00","working_hours":8.00,"overtime_hours":0,"late_minutes":0,"undertime_minutes":0,"status":"Present","notes":""},
+    {"date":"2026-01-20","day_of_week":"Tuesday",  "clock_in":"08:00:00","clock_out":"17:00:00","working_hours":8.00,"overtime_hours":0,"late_minutes":0,"undertime_minutes":0,"status":"Present","notes":""},
+    {"date":"2026-01-21","day_of_week":"Wednesday","clock_in":"08:00:00","clock_out":"17:00:00","working_hours":8.00,"overtime_hours":0,"late_minutes":0,"undertime_minutes":0,"status":"Present","notes":""},
+    {"date":"2026-01-22","day_of_week":"Thursday", "clock_in":"08:00:00","clock_out":"17:00:00","working_hours":8.00,"overtime_hours":0,"late_minutes":0,"undertime_minutes":0,"status":"Present","notes":""},
+    {"date":"2026-01-23","day_of_week":"Friday",   "clock_in":"08:00:00","clock_out":"20:00:00","working_hours":8.00,"overtime_hours":3.00,"late_minutes":0,"undertime_minutes":0,"status":"Present","notes":"Road project inspection overtime"},
+    {"date":"2026-01-26","day_of_week":"Monday",   "clock_in":"08:00:00","clock_out":"17:00:00","working_hours":8.00,"overtime_hours":0,"late_minutes":0,"undertime_minutes":0,"status":"Present","notes":""},
+    {"date":"2026-01-27","day_of_week":"Tuesday",  "clock_in":"08:00:00","clock_out":"17:00:00","working_hours":8.00,"overtime_hours":0,"late_minutes":0,"undertime_minutes":0,"status":"Present","notes":""},
+    {"date":"2026-01-28","day_of_week":"Wednesday","clock_in":"08:00:00","clock_out":"17:00:00","working_hours":8.00,"overtime_hours":0,"late_minutes":0,"undertime_minutes":0,"status":"Present","notes":""},
+    {"date":"2026-01-29","day_of_week":"Thursday", "clock_in":"08:00:00","clock_out":"17:00:00","working_hours":8.00,"overtime_hours":0,"late_minutes":0,"undertime_minutes":0,"status":"Present","notes":""},
+    {"date":"2026-01-30","day_of_week":"Friday",   "clock_in":"08:00:00","clock_out":"17:00:00","working_hours":8.00,"overtime_hours":0,"late_minutes":0,"undertime_minutes":0,"status":"Present","notes":""}
+  ]',
+  'Municipal HR Officer',
+  'Office of the Mayor – Direct Supervisor',
+  1,
+  '2026-02-02 09:00:00',
+  'Approved',
+  '/reports/dtr/RPT-DTR-2026-01-EMP002.pdf', 'PDF',
+  2, 1, 1,
+  '2026-02-01 07:10:00', '2026-02-02 10:00:00', '2026-02-03 11:00:00',
+  'One sick absence on Jan 12 – medical certificate on file. 6 overtime hours from two site inspection events. Verified against project logs.'
+),
+
+-- ─────────────────────────────────────────────────────────
+-- DTR Sample 3: Carmen Dela Cruz (MUN007) – January 2026
+--   Clerk, Municipal Civil Registrar's Office, Dept 8
+--   22 working days, 0 absent, 0 late, 0 overtime
+--   Clean DTR – used for payroll base reference
+-- ─────────────────────────────────────────────────────────
+(
+  'RPT-DTR-2026-01-EMP007',
+  'DTR Report',
+  'January 2026 Daily Time Record – Carmen Dela Cruz (MUN007)',
+  'Official Daily Time Record for Clerk Carmen Dela Cruz for January 2026. Perfect attendance with no late arrivals or absences.',
+  '2026-01-01', '2026-01-31',
+  8, 7,
+  NULL, NULL, NULL, NULL, NULL, NULL, NULL,
+  NULL, NULL, NULL, NULL, NULL, NULL,
+  NULL, NULL, NULL, NULL, NULL, NULL, NULL,
+  NULL, NULL, NULL, NULL, NULL, NULL,
+  -- DTR
+  7,
+  22, 0, 0.00, 0.00, 0.00, 176.00,
+  '[
+    {"date":"2026-01-02","day_of_week":"Friday",   "clock_in":"07:58:00","clock_out":"17:02:00","working_hours":8.00,"overtime_hours":0,"late_minutes":0,"undertime_minutes":0,"status":"Present","notes":""},
+    {"date":"2026-01-05","day_of_week":"Monday",   "clock_in":"07:55:00","clock_out":"17:00:00","working_hours":8.00,"overtime_hours":0,"late_minutes":0,"undertime_minutes":0,"status":"Present","notes":""},
+    {"date":"2026-01-06","day_of_week":"Tuesday",  "clock_in":"08:00:00","clock_out":"17:00:00","working_hours":8.00,"overtime_hours":0,"late_minutes":0,"undertime_minutes":0,"status":"Present","notes":""},
+    {"date":"2026-01-07","day_of_week":"Wednesday","clock_in":"07:59:00","clock_out":"17:01:00","working_hours":8.00,"overtime_hours":0,"late_minutes":0,"undertime_minutes":0,"status":"Present","notes":""},
+    {"date":"2026-01-08","day_of_week":"Thursday", "clock_in":"08:00:00","clock_out":"17:00:00","working_hours":8.00,"overtime_hours":0,"late_minutes":0,"undertime_minutes":0,"status":"Present","notes":""},
+    {"date":"2026-01-09","day_of_week":"Friday",   "clock_in":"07:57:00","clock_out":"17:00:00","working_hours":8.00,"overtime_hours":0,"late_minutes":0,"undertime_minutes":0,"status":"Present","notes":""},
+    {"date":"2026-01-12","day_of_week":"Monday",   "clock_in":"08:00:00","clock_out":"17:00:00","working_hours":8.00,"overtime_hours":0,"late_minutes":0,"undertime_minutes":0,"status":"Present","notes":""},
+    {"date":"2026-01-13","day_of_week":"Tuesday",  "clock_in":"08:00:00","clock_out":"17:00:00","working_hours":8.00,"overtime_hours":0,"late_minutes":0,"undertime_minutes":0,"status":"Present","notes":""},
+    {"date":"2026-01-14","day_of_week":"Wednesday","clock_in":"07:56:00","clock_out":"17:00:00","working_hours":8.00,"overtime_hours":0,"late_minutes":0,"undertime_minutes":0,"status":"Present","notes":""},
+    {"date":"2026-01-15","day_of_week":"Thursday", "clock_in":"08:00:00","clock_out":"17:00:00","working_hours":8.00,"overtime_hours":0,"late_minutes":0,"undertime_minutes":0,"status":"Present","notes":""},
+    {"date":"2026-01-16","day_of_week":"Friday",   "clock_in":"08:00:00","clock_out":"17:00:00","working_hours":8.00,"overtime_hours":0,"late_minutes":0,"undertime_minutes":0,"status":"Present","notes":""},
+    {"date":"2026-01-19","day_of_week":"Monday",   "clock_in":"08:00:00","clock_out":"17:00:00","working_hours":8.00,"overtime_hours":0,"late_minutes":0,"undertime_minutes":0,"status":"Present","notes":""},
+    {"date":"2026-01-20","day_of_week":"Tuesday",  "clock_in":"07:58:00","clock_out":"17:00:00","working_hours":8.00,"overtime_hours":0,"late_minutes":0,"undertime_minutes":0,"status":"Present","notes":""},
+    {"date":"2026-01-21","day_of_week":"Wednesday","clock_in":"08:00:00","clock_out":"17:00:00","working_hours":8.00,"overtime_hours":0,"late_minutes":0,"undertime_minutes":0,"status":"Present","notes":""},
+    {"date":"2026-01-22","day_of_week":"Thursday", "clock_in":"08:00:00","clock_out":"17:00:00","working_hours":8.00,"overtime_hours":0,"late_minutes":0,"undertime_minutes":0,"status":"Present","notes":""},
+    {"date":"2026-01-23","day_of_week":"Friday",   "clock_in":"08:00:00","clock_out":"17:00:00","working_hours":8.00,"overtime_hours":0,"late_minutes":0,"undertime_minutes":0,"status":"Present","notes":""},
+    {"date":"2026-01-26","day_of_week":"Monday",   "clock_in":"07:59:00","clock_out":"17:01:00","working_hours":8.00,"overtime_hours":0,"late_minutes":0,"undertime_minutes":0,"status":"Present","notes":""},
+    {"date":"2026-01-27","day_of_week":"Tuesday",  "clock_in":"08:00:00","clock_out":"17:00:00","working_hours":8.00,"overtime_hours":0,"late_minutes":0,"undertime_minutes":0,"status":"Present","notes":""},
+    {"date":"2026-01-28","day_of_week":"Wednesday","clock_in":"08:00:00","clock_out":"17:00:00","working_hours":8.00,"overtime_hours":0,"late_minutes":0,"undertime_minutes":0,"status":"Present","notes":""},
+    {"date":"2026-01-29","day_of_week":"Thursday", "clock_in":"07:55:00","clock_out":"17:00:00","working_hours":8.00,"overtime_hours":0,"late_minutes":0,"undertime_minutes":0,"status":"Present","notes":""},
+    {"date":"2026-01-30","day_of_week":"Friday",   "clock_in":"08:00:00","clock_out":"17:00:00","working_hours":8.00,"overtime_hours":0,"late_minutes":0,"undertime_minutes":0,"status":"Present","notes":""},
+    {"date":"2026-01-31","day_of_week":"Saturday", "clock_in":null,      "clock_out":null,      "working_hours":0,  "overtime_hours":0,"late_minutes":0,"undertime_minutes":0,"status":"Rest Day","notes":""}
+  ]',
+  'Municipal HR Officer',
+  'Municipal Civil Registrar – Direct Supervisor',
+  1,
+  '2026-02-02 08:00:00',
+  'Approved',
+  '/reports/dtr/RPT-DTR-2026-01-EMP007.pdf', 'PDF',
+  2, 1, 1,
+  '2026-02-01 07:00:00', '2026-02-02 08:30:00', '2026-02-03 09:00:00',
+  'Perfect attendance. 22/22 working days present. No deductions applicable. Submitted for payroll processing reference.'
+);
+
+
+-- ============================================================
+-- 4. UPDATE AUTO_INCREMENT
+-- ============================================================
+
+ALTER TABLE `reports`
+  MODIFY `report_id` INT(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=16;
+
+
+SET FOREIGN_KEY_CHECKS = 1;
+
 COMMIT;
+
 
 /*!40101 SET CHARACTER_SET_CLIENT=@OLD_CHARACTER_SET_CLIENT */;
 /*!40101 SET CHARACTER_SET_RESULTS=@OLD_CHARACTER_SET_RESULTS */;

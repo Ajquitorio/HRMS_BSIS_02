@@ -11,20 +11,13 @@ if (!isset($_SESSION['loggedin']) || $_SESSION['loggedin'] !== true) {
 }
 
 // Include database connection and helper functions
-require_once 'dp.php';
+require_once 'config.php';
 
-// Database connection
-$host = getenv('DB_HOST') ?? 'localhost';
-$dbname = getenv('DB_NAME') ?? 'hr_system';
-$username = getenv('DB_USER') ?? 'root';
-$password = getenv('DB_PASS') ?? '';
+// For backward compatibility with existing code
+$pdo = $conn;
 
-try {
-    $pdo = new PDO("mysql:host=$host;dbname=$dbname", $username, $password);
-    $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
-} catch(PDOException $e) {
-    die("Connection failed: " . $e->getMessage());
-}
+// Get passed personal_info_id for linking from employment history
+$linkedPersonalInfoId = isset($_GET['personal_info_id']) ? intval($_GET['personal_info_id']) : null;
 
 // Handle form submissions
 $message = '';
@@ -53,12 +46,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 try {
                     $pdo->beginTransaction();
                     
-                    // Check for duplicate Tax ID or SSN
-                    $checkStmt = $pdo->prepare("SELECT COUNT(*) FROM personal_information WHERE tax_id = ? OR social_security_number = ?");
-                    $checkStmt->execute([$_POST['tax_id'], $_POST['social_security_number']]);
+                    // Check for duplicate Tax ID or GSIS ID
+                    $checkStmt = $pdo->prepare("SELECT COUNT(*) FROM personal_information WHERE tax_id = ? OR gsis_id = ?");
+                    $checkStmt->execute([$_POST['tax_id'], $_POST['gsis_id']]);
                     
                     if ($checkStmt->fetchColumn() > 0) {
-                        $message = "Error: Tax ID or Social Security Number already exists!";
+                        $message = "Error: Tax ID or GSIS ID already exists!";
                         $messageType = "error";
                         $pdo->rollBack();
                     } else {
@@ -70,11 +63,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         
                         $stmt = $pdo->prepare("INSERT INTO personal_information (
                             first_name, last_name, date_of_birth, gender, marital_status, marital_status_date, 
-                            marital_status_document_url, nationality, tax_id, social_security_number, 
+                            spouse_name, marital_status_document, document_type, document_number, issuing_authority, nationality, tax_id, gsis_id, 
                             pag_ibig_id, philhealth_id, phone_number, 
                             emergency_contact_name, emergency_contact_relationship, emergency_contact_phone,
-                            highest_educational_attainment, course_degree, school_university, year_graduated
-                        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+                            highest_education_level, field_of_study, institution_name, graduation_year, previous_job_experiences,
+                            certifications, additional_training
+                        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+                        
+                        $previousJobExperiences = !empty($_POST['previous_job_experiences']) ? json_encode(explode('\n\n', $_POST['previous_job_experiences'])) : null;
                         
                         $stmt->execute([
                             $_POST['first_name'],
@@ -83,20 +79,27 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                             $_POST['gender'],
                             $_POST['marital_status'],
                             !empty($_POST['marital_status_date']) ? $_POST['marital_status_date'] : null,
+                            $_POST['spouse_name'] ?? null,
                             $maritalDocUrl,
+                            $_POST['document_type'] ?? null,
+                            $_POST['document_number'] ?? null,
+                            $_POST['issuing_authority'] ?? null,
                             $_POST['nationality'],
                             $_POST['tax_id'],
-                            $_POST['social_security_number'],
+                            $_POST['gsis_id'],
                             $_POST['pag_ibig_id'] ?? null,
                             $_POST['philhealth_id'] ?? null,
                             $_POST['phone_number'],
                             $_POST['emergency_contact_name'],
                             $_POST['emergency_contact_relationship'],
                             $_POST['emergency_contact_phone'],
-                            !empty($_POST['highest_educational_attainment']) ? $_POST['highest_educational_attainment'] : null,
-                            $_POST['course_degree'] ?? null,
-                            $_POST['school_university'] ?? null,
-                            !empty($_POST['year_graduated']) ? $_POST['year_graduated'] : null
+                            !empty($_POST['highest_education_level']) ? $_POST['highest_education_level'] : null,
+                            $_POST['field_of_study'] ?? null,
+                            $_POST['institution_name'] ?? null,
+                            !empty($_POST['graduation_year']) ? $_POST['graduation_year'] : null,
+                            $previousJobExperiences,
+                            $_POST['certifications'] ?? null,
+                            $_POST['additional_training'] ?? null
                         ]);
                         
                         $personalInfoId = $pdo->lastInsertId();
@@ -136,12 +139,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 try {
                     $pdo->beginTransaction();
                     
-                    // Check for duplicate Tax ID or SSN (excluding current record)
-                    $checkStmt = $pdo->prepare("SELECT COUNT(*) FROM personal_information WHERE (tax_id = ? OR social_security_number = ?) AND personal_info_id != ?");
-                    $checkStmt->execute([$_POST['tax_id'], $_POST['social_security_number'], $_POST['personal_info_id']]);
+                    // Check for duplicate Tax ID or GSIS ID (excluding current record)
+                    $checkStmt = $pdo->prepare("SELECT COUNT(*) FROM personal_information WHERE (tax_id = ? OR gsis_id = ?) AND personal_info_id != ?");
+                    $checkStmt->execute([$_POST['tax_id'], $_POST['gsis_id'], $_POST['personal_info_id']]);
                     
                     if ($checkStmt->fetchColumn() > 0) {
-                        $message = "Error: Tax ID or Social Security Number already exists!";
+                        $message = "Error: Tax ID or GSIS ID already exists!";
                         $messageType = "error";
                         $pdo->rollBack();
                     } else {
@@ -151,12 +154,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                             $maritalDocUrl = handleFileUpload($_FILES['marital_status_document'], 'uploads/marital_documents/');
                         }
                         
+                        $previousJobExperiences = !empty($_POST['previous_job_experiences']) ? json_encode(explode('\n\n', $_POST['previous_job_experiences'])) : null;
+                        
                         $stmt = $pdo->prepare("UPDATE personal_information SET 
                             first_name=?, last_name=?, date_of_birth=?, gender=?, marital_status=?, 
-                            marital_status_date=?, marital_status_document_url=?, nationality=?, tax_id=?, 
-                            social_security_number=?, pag_ibig_id=?, philhealth_id=?, phone_number=?, 
+                            marital_status_date=?, spouse_name=?, marital_status_document=?, document_type=?, document_number=?, issuing_authority=?, nationality=?, tax_id=?, 
+                            gsis_id=?, pag_ibig_id=?, philhealth_id=?, phone_number=?, 
                             emergency_contact_name=?, emergency_contact_relationship=?, emergency_contact_phone=?,
-                            highest_educational_attainment=?, course_degree=?, school_university=?, year_graduated=?
+                            highest_education_level=?, field_of_study=?, institution_name=?, graduation_year=?, previous_job_experiences=?, certifications=?, additional_training=?
                             WHERE personal_info_id=?");
                         
                         $stmt->execute([
@@ -166,20 +171,27 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                             $_POST['gender'],
                             $_POST['marital_status'],
                             !empty($_POST['marital_status_date']) ? $_POST['marital_status_date'] : null,
+                            $_POST['spouse_name'] ?? null,
                             $maritalDocUrl,
+                            $_POST['document_type'] ?? null,
+                            $_POST['document_number'] ?? null,
+                            $_POST['issuing_authority'] ?? null,
                             $_POST['nationality'],
                             $_POST['tax_id'],
-                            $_POST['social_security_number'],
+                            $_POST['gsis_id'],
                             $_POST['pag_ibig_id'] ?? null,
                             $_POST['philhealth_id'] ?? null,
                             $_POST['phone_number'],
                             $_POST['emergency_contact_name'],
                             $_POST['emergency_contact_relationship'],
                             $_POST['emergency_contact_phone'],
-                            !empty($_POST['highest_educational_attainment']) ? $_POST['highest_educational_attainment'] : null,
-                            $_POST['course_degree'] ?? null,
-                            $_POST['school_university'] ?? null,
-                            !empty($_POST['year_graduated']) ? $_POST['year_graduated'] : null,
+                            !empty($_POST['highest_education_level']) ? $_POST['highest_education_level'] : null,
+                            $_POST['field_of_study'] ?? null,
+                            $_POST['institution_name'] ?? null,
+                            !empty($_POST['graduation_year']) ? $_POST['graduation_year'] : null,
+                            $previousJobExperiences,
+                            $_POST['certifications'] ?? null,
+                            $_POST['additional_training'] ?? null,
                             $_POST['personal_info_id']
                         ]);
                         
@@ -228,6 +240,49 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 }
                 break;
             
+            case 'add_certification':
+                // Add employee certification
+                try {
+                    $certificationDocUrl = null;
+                    if (isset($_FILES['certification_file']) && $_FILES['certification_file']['error'] === 0) {
+                        $certificationDocUrl = handleFileUpload($_FILES['certification_file'], 'uploads/certifications/');
+                    }
+                    
+                    if (!$certificationDocUrl) {
+                        throw new Exception('Certification file upload failed!');
+                    }
+                    
+                    $fileInfo = $_FILES['certification_file'];
+                    $fileType = pathinfo($fileInfo['name'], PATHINFO_EXTENSION);
+                    $fileSize = $fileInfo['size'];
+                    
+                    $stmt = $pdo->prepare("INSERT INTO employee_certifications (
+                        personal_info_id, certification_name, issuing_organization, issue_date, expiry_date,
+                        certification_number, file_path, file_type, file_size, obtained_before_joining, status
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+                    
+                    $stmt->execute([
+                        $_POST['personal_info_id'],
+                        $_POST['certification_name'],
+                        $_POST['issuing_organization'],
+                        $_POST['issue_date'],
+                        !empty($_POST['expiry_date']) ? $_POST['expiry_date'] : null,
+                        $_POST['certification_number'] ?? null,
+                        $certificationDocUrl,
+                        $fileType,
+                        $fileSize,
+                        1, // obtained_before_joining = true
+                        'Pending Verification'
+                    ]);
+                    
+                    $message = "Certification added successfully!";
+                    $messageType = "success";
+                } catch (Exception $e) {
+                    $message = "Error adding certification: " . $e->getMessage();
+                    $messageType = "error";
+                }
+                break;
+            
             case 'add_marital_history':
                 // Add marital status history
                 try {
@@ -258,11 +313,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     ]);
                     
                     // Update personal_information table
-                    $updatePersonalStmt = $pdo->prepare("UPDATE personal_information SET marital_status = ?, marital_status_date = ?, marital_status_document_url = ? WHERE personal_info_id = ?");
+                    $updatePersonalStmt = $pdo->prepare("UPDATE personal_information SET marital_status = ?, marital_status_date = ?, spouse_name = ?, marital_status_document = ?, document_type = ? WHERE personal_info_id = ?");
                     $updatePersonalStmt->execute([
                         $_POST['marital_status_new'],
                         $_POST['status_date'],
+                        $_POST['spouse_name'] ?? null,
                         $maritalDocUrl,
+                        $_POST['supporting_document_type'] ?? null,
                         $_POST['personal_info_id']
                     ]);
                     
@@ -353,6 +410,28 @@ $stmt = $pdo->query("
     ORDER BY pi.personal_info_id DESC
 ");
 $personalInfo = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+// Fetch education, marital history, and certifications for use in JavaScript
+try {
+    $educationStmt = $pdo->query("SELECT * FROM educational_background ORDER BY personal_info_id, year_graduated DESC");
+    $educationData = $educationStmt->fetchAll(PDO::FETCH_ASSOC);
+} catch (PDOException $e) {
+    $educationData = [];
+}
+
+try {
+    $maritalStmt = $pdo->query("SELECT * FROM marital_status_history ORDER BY personal_info_id, status_date DESC");
+    $maritalHistoryData = $maritalStmt->fetchAll(PDO::FETCH_ASSOC);
+} catch (PDOException $e) {
+    $maritalHistoryData = [];
+}
+
+try {
+    $certificationStmt = $pdo->query("SELECT * FROM employee_certifications WHERE obtained_before_joining = 1 ORDER BY personal_info_id, issue_date DESC");
+    $employeeCertifications = $certificationStmt->fetchAll(PDO::FETCH_ASSOC);
+} catch (PDOException $e) {
+    $employeeCertifications = [];
+}
 ?>
 
 <!DOCTYPE html>
@@ -703,6 +782,36 @@ $personalInfo = $stmt->fetchAll(PDO::FETCH_ASSOC);
             color: #333;
         }
 
+        .nav-buttons-section {
+            background: linear-gradient(135deg, var(--azure-blue-pale) 0%, #f0f0f0 100%);
+            padding: 25px;
+            border-radius: 10px;
+            margin-top: 20px;
+            border-left: 4px solid var(--azure-blue);
+        }
+
+        .nav-buttons-section h4 {
+            color: var(--azure-blue-dark);
+            margin-bottom: 15px;
+            font-weight: 600;
+        }
+
+        .nav-button-group {
+            display: flex;
+            gap: 12px;
+            flex-wrap: wrap;
+        }
+
+        .nav-button-group .btn {
+            flex: 1;
+            min-width: 140px;
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+        }
+
         @media (max-width: 768px) {
             .controls {
                 flex-direction: column;
@@ -787,10 +896,10 @@ $personalInfo = $stmt->fetchAll(PDO::FETCH_ASSOC);
                                         <?php endif; ?>
                                     </td>
                                     <td>
-                                        <?php if ($person['highest_educational_attainment']): ?>
-                                            <span class="education-badge">🎓 <?= htmlspecialchars($person['highest_educational_attainment']) ?></span>
-                                            <?php if ($person['school_university']): ?>
-                                                <br><small style="color: #666;"><?= htmlspecialchars($person['school_university']) ?></small>
+                                        <?php if ($person['highest_education_level']): ?>
+                                            <span class="education-badge">🎓 <?= htmlspecialchars($person['highest_education_level']) ?></span>
+                                            <?php if ($person['institution_name']): ?>
+                                                <br><small style="color: #666;"><?= htmlspecialchars($person['institution_name']) ?></small>
                                             <?php endif; ?>
                                         <?php else: ?>
                                             <small style="color: #999;">No education recorded</small>
@@ -811,11 +920,11 @@ $personalInfo = $stmt->fetchAll(PDO::FETCH_ASSOC);
                                         <button class="btn btn-warning btn-small" onclick="editPerson(<?= $person['personal_info_id'] ?>)">
                                             ✏️ Edit
                                         </button>
-                                        <button class="btn btn-success btn-small" onclick="printPDS(<?= $person['personal_info_id'] ?>)">
+                                        <button class="btn btn-primary btn-small" onclick="printPDS(<?= $person['personal_info_id'] ?>)">
                                             🖨️ Print PDS
                                         </button>
-                                        <button class="btn btn-danger btn-small" onclick="deletePerson(<?= $person['personal_info_id'] ?>, '<?= htmlspecialchars(addslashes($person['full_name'])) ?>')">
-                                            🗑️ Delete
+                                        <button class="btn btn-warning btn-small" onclick="deletePerson(<?= $person['personal_info_id'] ?>, '<?= htmlspecialchars(addslashes($person['full_name'])) ?>')">
+                                            📦 Archive
                                         </button>
                                     </td>
                                 </tr>
@@ -979,8 +1088,8 @@ $personalInfo = $stmt->fetchAll(PDO::FETCH_ASSOC);
                         </div>
                         <div class="form-col">
                             <div class="form-group">
-                                <label for="social_security_number">Social Security Number *</label>
-                                <input type="text" id="social_security_number" name="social_security_number" class="form-control" required>
+                                <label for="gsis_id">GSIS ID (Government Service Insurance System)</label>
+                                <input type="text" id="gsis_id" name="gsis_id" class="form-control">
                             </div>
                         </div>
                     </div>
@@ -997,6 +1106,14 @@ $personalInfo = $stmt->fetchAll(PDO::FETCH_ASSOC);
                                 <input type="text" id="philhealth_id" name="philhealth_id" class="form-control">
                             </div>
                         </div>
+                    </div>
+
+                    <!-- Previous Work Experience Section -->
+                    <div class="section-divider"></div>
+                    <div class="section-header">💼 Previous Work Experience</div>
+                    <div class="form-group">
+                        <label for="previous_job_experiences">Previous Job Experiences (One job per line, separate with blank line)</label>
+                        <textarea id="previous_job_experiences" name="previous_job_experiences" class="form-control" rows="6" placeholder="Job Title: Senior Accountant&#10;Company: ABC Corporation&#10;Duration: 2015-2020&#10;Responsibilities: Financial reporting, audit&#10;&#10;Job Title: Accountant&#10;Company: XYZ Company&#10;Duration: 2010-2015&#10;Responsibilities: General accounting, reconciliation"></textarea>
                     </div>
 
                     <!-- Emergency Contact Section -->
@@ -1028,8 +1145,8 @@ $personalInfo = $stmt->fetchAll(PDO::FETCH_ASSOC);
                     <div class="form-row">
                         <div class="form-col">
                             <div class="form-group">
-                                <label for="highest_educational_attainment">Highest Educational Attainment</label>
-                                <select id="highest_educational_attainment" name="highest_educational_attainment" class="form-control">
+                                <label for="highest_education_level">Highest Educational Attainment</label>
+                                <select id="highest_education_level" name="highest_education_level" class="form-control">
                                     <option value="">Select Level</option>
                                     <option value="Elementary">Elementary</option>
                                     <option value="High School">High School</option>
@@ -1044,8 +1161,8 @@ $personalInfo = $stmt->fetchAll(PDO::FETCH_ASSOC);
                         </div>
                         <div class="form-col">
                             <div class="form-group">
-                                <label for="course_degree">Course/Degree</label>
-                                <input type="text" id="course_degree" name="course_degree" class="form-control">
+                                <label for="field_of_study">Course/Degree</label>
+                                <input type="text" id="field_of_study" name="field_of_study" class="form-control">
                             </div>
                         </div>
                     </div>
@@ -1053,16 +1170,32 @@ $personalInfo = $stmt->fetchAll(PDO::FETCH_ASSOC);
                     <div class="form-row">
                         <div class="form-col">
                             <div class="form-group">
-                                <label for="school_university">School/University</label>
-                                <input type="text" id="school_university" name="school_university" class="form-control">
+                                <label for="institution_name">School/University</label>
+                                <input type="text" id="institution_name" name="institution_name" class="form-control">
                             </div>
                         </div>
                         <div class="form-col">
                             <div class="form-group">
-                                <label for="year_graduated">Year Graduated</label>
-                                <input type="number" id="year_graduated" name="year_graduated" class="form-control" min="1900" max="<?= date('Y') ?>">
+                                <label for="graduation_year">Year Graduated</label>
+                                <input type="number" id="graduation_year" name="graduation_year" class="form-control" min="1900" max="<?= date('Y') ?>">
                             </div>
                         </div>
+                    </div>
+
+                    <!-- Certifications Section -->
+                    <div class="section-divider"></div>
+                    <div class="section-header">🏆 Professional Certifications</div>
+                    <div class="form-group">
+                        <label for="certifications">Certifications (One per line or comma-separated)</label>
+                        <textarea id="certifications" name="certifications" class="form-control" rows="3" placeholder="Certified Public Accountant (CPA)&#10;Project Management Professional (PMP)&#10;ITIL Foundation Certification"></textarea>
+                    </div>
+
+                    <!-- Additional Training Section -->
+                    <div class="section-divider"></div>
+                    <div class="section-header">📚 Additional Training</div>
+                    <div class="form-group">
+                        <label for="additional_training">Training Programs (One per line or comma-separated)</label>
+                        <textarea id="additional_training" name="additional_training" class="form-control" rows="3" placeholder="Advanced Excel Training&#10;Leadership Workshop&#10;Agile Scrum Master Training"></textarea>
                     </div>
 
                     <div style="text-align: center; margin-top: 30px;">
@@ -1085,6 +1218,12 @@ $personalInfo = $stmt->fetchAll(PDO::FETCH_ASSOC);
                 <!-- Content will be loaded dynamically -->
             </div>
             <div style="padding: 20px 30px; border-top: 1px solid #e0e0e0; text-align: center;">
+                <button class="btn btn-info" id="addEducationFromView" onclick="openEducationModal()" style="display: none; margin-right: 5px;">
+                    🎓 Add Education
+                </button>
+                <button class="btn btn-info" id="addCertificationFromView" onclick="openCertificationModal()" style="display: none; margin-right: 5px;">
+                    🏆 Add Certification
+                </button>
                 <button class="btn btn-success" id="printPDSFromView" onclick="printPDSFromViewModal()" style="display: none;">
                     🖨️ Print PDS
                 </button>
@@ -1092,36 +1231,183 @@ $personalInfo = $stmt->fetchAll(PDO::FETCH_ASSOC);
         </div>
     </div>
 
+    <!-- Add Education Modal -->
+    <div id="educationModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Add Educational Background</h2>
+                <span class="close" onclick="closeEducationModal()">&times;</span>
+            </div>
+            <div class="modal-body">
+                <form id="educationForm" method="POST">
+                    <input type="hidden" name="action" value="add_education">
+                    <input type="hidden" id="edu_personal_info_id" name="personal_info_id">
+                    
+                    <div class="form-row">
+                        <div class="form-col">
+                            <div class="form-group">
+                                <label for="education_level">Education Level *</label>
+                                <select id="education_level" name="education_level" class="form-control" required>
+                                    <option value="">Select Level</option>
+                                    <option value="Elementary">Elementary</option>
+                                    <option value="High School">High School</option>
+                                    <option value="Vocational">Vocational</option>
+                                    <option value="Associate Degree">Associate Degree</option>
+                                    <option value="Bachelor's Degree">Bachelor's Degree</option>
+                                    <option value="Master's Degree">Master's Degree</option>
+                                    <option value="Doctorate">Doctorate</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="form-col">
+                            <div class="form-group">
+                                <label for="school_name">School/University Name *</label>
+                                <input type="text" id="school_name" name="school_name" class="form-control" required>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="form-row">
+                        <div class="form-col">
+                            <div class="form-group">
+                                <label for="course_degree">Course/Degree</label>
+                                <input type="text" id="course_degree" name="course_degree" class="form-control">
+                            </div>
+                        </div>
+                        <div class="form-col">
+                            <div class="form-group">
+                                <label for="major_specialization">Major/Specialization</label>
+                                <input type="text" id="major_specialization" name="major_specialization" class="form-control">
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="form-row">
+                        <div class="form-col">
+                            <div class="form-group">
+                                <label for="year_started">Year Started</label>
+                                <input type="number" id="year_started" name="year_started" class="form-control" min="1900" max="<?= date('Y') ?>">
+                            </div>
+                        </div>
+                        <div class="form-col">
+                            <div class="form-group">
+                                <label for="year_graduated">Year Graduated</label>
+                                <input type="number" id="year_graduated" name="year_graduated" class="form-control" min="1900" max="<?= date('Y') ?>">
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="honors_awards">Honors/Awards</label>
+                        <input type="text" id="honors_awards" name="honors_awards" class="form-control">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="education_document">Document Upload</label>
+                        <input type="file" id="education_document" name="education_document" class="form-control" accept=".pdf,.jpg,.jpeg,.png">
+                    </div>
+                    
+                    <div style="text-align: center; margin-top: 20px;">
+                        <button type="button" class="btn" style="background: #6c757d; color: white; margin-right: 10px;" onclick="closeEducationModal()">Cancel</button>
+                        <button type="submit" class="btn btn-success">💾 Save Education</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Add Certification Modal -->
+    <div id="certificationModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Add Professional Certification</h2>
+                <span class="close" onclick="closeCertificationModal()">&times;</span>
+            </div>
+            <div class="modal-body">
+                <form id="certificationForm" method="POST" enctype="multipart/form-data">
+                    <input type="hidden" name="action" value="add_certification">
+                    <input type="hidden" id="cert_personal_info_id" name="personal_info_id">
+                    
+                    <div class="form-row">
+                        <div class="form-col">
+                            <div class="form-group">
+                                <label for="certification_name">Certification Name *</label>
+                                <input type="text" id="certification_name" name="certification_name" class="form-control" required>
+                            </div>
+                        </div>
+                        <div class="form-col">
+                            <div class="form-group">
+                                <label for="issuing_organization">Issuing Organization *</label>
+                                <input type="text" id="issuing_organization" name="issuing_organization" class="form-control" required>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="form-row">
+                        <div class="form-col">
+                            <div class="form-group">
+                                <label for="issue_date">Issue Date *</label>
+                                <input type="date" id="issue_date" name="issue_date" class="form-control" required>
+                            </div>
+                        </div>
+                        <div class="form-col">
+                            <div class="form-group">
+                                <label for="expiry_date">Expiry Date</label>
+                                <input type="date" id="expiry_date" name="expiry_date" class="form-control">
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="certification_number">Certification Number</label>
+                        <input type="text" id="certification_number" name="certification_number" class="form-control">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="certification_file">Certificate File *</label>
+                        <input type="file" id="certification_file" name="certification_file" class="form-control" accept=".pdf,.jpg,.jpeg,.png" required>
+                        <small style="color: #666;">PDF, JPG, or PNG format. Max 5MB</small>
+                    </div>
+                    
+                    <div style="text-align: center; margin-top: 20px;">
+                        <button type="button" class="btn" style="background: #6c757d; color: white; margin-right: 10px;" onclick="closeCertificationModal()">Cancel</button>
+                        <button type="submit" class="btn btn-success">💾 Save Certification</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
     <script>
         // Global variables
         let personalInfoData = <?= json_encode($personalInfo) ?>;
-        
-        // Fetch education and marital history data
-        <?php
-        $educationStmt = $pdo->query("SELECT * FROM educational_background ORDER BY personal_info_id, year_graduated DESC");
-        $educationData = $educationStmt->fetchAll(PDO::FETCH_ASSOC);
-        
-        $maritalStmt = $pdo->query("SELECT * FROM marital_status_history ORDER BY personal_info_id, status_date DESC");
-        $maritalHistoryData = $maritalStmt->fetchAll(PDO::FETCH_ASSOC);
-        ?>
         let educationData = <?= json_encode($educationData) ?>;
         let maritalHistoryData = <?= json_encode($maritalHistoryData) ?>;
+        let employeeCertifications = <?= json_encode($employeeCertifications) ?>;
 
-        // Search functionality
-        document.getElementById('searchInput').addEventListener('input', function() {
-            const searchTerm = this.value.toLowerCase();
-            const tableBody = document.getElementById('personalInfoTableBody');
-            const rows = tableBody.getElementsByTagName('tr');
+        // Initialize on page load
+        document.addEventListener('DOMContentLoaded', function() {
+            // Search functionality
+            const searchInput = document.getElementById('searchInput');
+            if (searchInput) {
+                searchInput.addEventListener('input', function() {
+                    const searchTerm = this.value.toLowerCase();
+                    const tableBody = document.getElementById('personalInfoTableBody');
+                    if (tableBody) {
+                        const rows = tableBody.getElementsByTagName('tr');
 
-            for (let i = 0; i < rows.length; i++) {
-                const row = rows[i];
-                const text = row.textContent.toLowerCase();
-                
-                if (text.includes(searchTerm)) {
-                    row.style.display = '';
-                } else {
-                    row.style.display = 'none';
-                }
+                        for (let i = 0; i < rows.length; i++) {
+                            const row = rows[i];
+                            const text = row.textContent.toLowerCase();
+                            
+                            if (text.includes(searchTerm)) {
+                                row.style.display = '';
+                            } else {
+                                row.style.display = 'none';
+                            }
+                        }
+                    }
+                });
             }
         });
 
@@ -1173,18 +1459,20 @@ $personalInfo = $stmt->fetchAll(PDO::FETCH_ASSOC);
                 document.getElementById('marital_status').value = person.marital_status || '';
                 document.getElementById('marital_status_date').value = person.marital_status_date || '';
                 document.getElementById('tax_id').value = person.tax_id || '';
-                document.getElementById('social_security_number').value = person.social_security_number || '';
+                document.getElementById('gsis_id').value = person.gsis_id || '';
                 document.getElementById('pag_ibig_id').value = person.pag_ibig_id || '';
                 document.getElementById('philhealth_id').value = person.philhealth_id || '';
                 document.getElementById('emergency_contact_name').value = person.emergency_contact_name || '';
                 document.getElementById('emergency_contact_relationship').value = person.emergency_contact_relationship || '';
                 document.getElementById('emergency_contact_phone').value = person.emergency_contact_phone || '';
-                document.getElementById('highest_educational_attainment').value = person.highest_educational_attainment || '';
-                document.getElementById('course_degree').value = person.course_degree || '';
-                document.getElementById('school_university').value = person.school_university || '';
-                document.getElementById('year_graduated').value = person.year_graduated || '';
-                if (person.marital_status_document_url) {
-                    document.getElementById('existing_marital_doc').value = person.marital_status_document_url;
+                document.getElementById('highest_education_level').value = person.highest_education_level || '';
+                document.getElementById('field_of_study').value = person.field_of_study || '';
+                document.getElementById('institution_name').value = person.institution_name || '';
+                document.getElementById('graduation_year').value = person.graduation_year || '';
+                document.getElementById('certifications').value = person.certifications || '';
+                document.getElementById('additional_training').value = person.additional_training || '';
+                if (person.marital_status_document) {
+                    document.getElementById('existing_marital_doc').value = person.marital_status_document;
                 }
             }
         }
@@ -1216,9 +1504,12 @@ $personalInfo = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
             const personEducation = educationData.filter(e => e.personal_info_id == personalInfoId);
             const personMaritalHistory = maritalHistoryData.filter(m => m.personal_info_id == personalInfoId);
+            const personCertifications = employeeCertifications.filter(c => c.personal_info_id == personalInfoId);
             
-            // Show print button
+            // Show action buttons
             document.getElementById('printPDSFromView').style.display = 'inline-block';
+            document.getElementById('addEducationFromView').style.display = 'inline-block';
+            document.getElementById('addCertificationFromView').style.display = 'inline-block';
 
             let html = `
                 <div class="info-grid">
@@ -1251,8 +1542,8 @@ $personalInfo = $stmt->fetchAll(PDO::FETCH_ASSOC);
                         <div class="info-value">${person.tax_id || 'N/A'}</div>
                     </div>
                     <div class="info-item">
-                        <div class="info-label">SSN</div>
-                        <div class="info-value">${person.social_security_number || 'N/A'}</div>
+                        <div class="info-label">GSIS ID</div>
+                        <div class="info-value">${person.gsis_id || 'N/A'}</div>
                     </div>
                     <div class="info-item">
                         <div class="info-label">Pag-IBIG ID</div>
@@ -1321,23 +1612,23 @@ $personalInfo = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
                 <div class="section-divider"></div>
                 <div class="section-header">🎓 Education</div>
-                ${person.highest_educational_attainment ? `
+                ${person.highest_education_level ? `
                     <div class="info-grid">
                         <div class="info-item">
                             <div class="info-label">Highest Attainment</div>
-                            <div class="info-value">${person.highest_educational_attainment}</div>
+                            <div class="info-value">${person.highest_education_level}</div>
                         </div>
                         <div class="info-item">
                             <div class="info-label">Course/Degree</div>
-                            <div class="info-value">${person.course_degree || 'N/A'}</div>
+                            <div class="info-value">${person.field_of_study || 'N/A'}</div>
                         </div>
                         <div class="info-item">
                             <div class="info-label">School/University</div>
-                            <div class="info-value">${person.school_university || 'N/A'}</div>
+                            <div class="info-value">${person.institution_name || 'N/A'}</div>
                         </div>
                         <div class="info-item">
                             <div class="info-label">Year Graduated</div>
-                            <div class="info-value">${person.year_graduated || 'N/A'}</div>
+                            <div class="info-value">${person.graduation_year || 'N/A'}</div>
                         </div>
                     </div>
                 ` : '<p>No education information recorded.</p>'}
@@ -1366,6 +1657,68 @@ $personalInfo = $stmt->fetchAll(PDO::FETCH_ASSOC);
                         </tbody>
                     </table>
                 ` : ''}
+
+                ${person.certifications ? `
+                    <div class="section-divider"></div>
+                    <div class="section-header">🏆 Professional Certifications</div>
+                    <div class="info-item">
+                        <div style="line-height: 1.8; color: #333;">
+                            ${person.certifications.split(',').map(cert => `<div>• ${cert.trim()}</div>`).join('')}
+                        </div>
+                    </div>
+                ` : ''}
+
+                ${person.additional_training ? `
+                    <div class="section-divider"></div>
+                    <div class="section-header">📚 Additional Training</div>
+                    <div class="info-item">
+                        <div style="line-height: 1.8; color: #333;">
+                            ${person.additional_training.split(',').map(training => `<div>• ${training.trim()}</div>`).join('')}
+                        </div>
+                    </div>
+                ` : ''}
+
+                ${personCertifications.length > 0 ? `
+                    <div class="section-divider"></div>
+                    <div class="section-header">🏆 Pre-Employment Certifications</div>
+                    <table class="table">
+                        <thead>
+                            <tr>
+                                <th>Certification Name</th>
+                                <th>Issuing Organization</th>
+                                <th>Issued Date</th>
+                                <th>Expiry Date</th>
+                                <th>Status</th>
+                                <th>Document</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${personCertifications.map(c => `
+                                <tr>
+                                    <td>${c.certification_name || 'N/A'}</td>
+                                    <td>${c.issuing_organization || 'N/A'}</td>
+                                    <td>${c.issue_date ? new Date(c.issue_date).toLocaleDateString() : 'N/A'}</td>
+                                    <td>${c.expiry_date ? new Date(c.expiry_date).toLocaleDateString() : 'N/A (No Expiry)'}</td>
+                                    <td><span class="status-badge" style="background: ${c.status === 'Verified' ? '#d4edda' : '#fff3cd'}; color: ${c.status === 'Verified' ? '#155724' : '#856404'};">${c.status}</span></td>
+                                    <td><a href="${c.file_path}" target="_blank" class="document-link">📄 View</a></td>
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                    </table>
+                ` : ''}
+            `;
+
+            // Add navigation section
+            html += `
+                <div class="nav-buttons-section">
+                    <h4>📋 Related Information</h4>
+                    <p style="color: #666; margin-bottom: 15px; font-size: 14px;">Access related records for this person:</p>
+                    <div class="nav-button-group">
+                        <a href="employment_history.php?personal_info_id=${personalInfoId}" class="btn btn-success" title="View employment history">
+                            📊 Employment History
+                        </a>
+                    </div>
+                </div>
             `;
 
             document.getElementById('viewDetailsContent').innerHTML = html;
@@ -1379,50 +1732,99 @@ $personalInfo = $stmt->fetchAll(PDO::FETCH_ASSOC);
             }
         }
 
+        // Education Modal Functions
+        function openEducationModal() {
+            if (!currentViewingPersonId) return;
+            document.getElementById('edu_personal_info_id').value = currentViewingPersonId;
+            document.getElementById('educationForm').reset();
+            document.getElementById('educationModal').style.display = 'block';
+            document.body.style.overflow = 'hidden';
+        }
+
+        function closeEducationModal() {
+            document.getElementById('educationModal').style.display = 'none';
+            document.body.style.overflow = 'auto';
+        }
+
+        // Certification Modal Functions
+        function openCertificationModal() {
+            if (!currentViewingPersonId) return;
+            document.getElementById('cert_personal_info_id').value = currentViewingPersonId;
+            document.getElementById('certificationForm').reset();
+            document.getElementById('certificationModal').style.display = 'block';
+            document.body.style.overflow = 'hidden';
+        }
+
+        function closeCertificationModal() {
+            document.getElementById('certificationModal').style.display = 'none';
+            document.body.style.overflow = 'auto';
+        }
+
         // Close modal when clicking outside
         window.onclick = function(event) {
             const personalInfoModal = document.getElementById('personalInfoModal');
             const viewDetailsModal = document.getElementById('viewDetailsModal');
+            const educationModal = document.getElementById('educationModal');
+            const certificationModal = document.getElementById('certificationModal');
+            
             if (event.target === personalInfoModal) {
                 closeModal();
             }
             if (event.target === viewDetailsModal) {
                 closeViewModal();
             }
+            if (event.target === educationModal) {
+                closeEducationModal();
+            }
+            if (event.target === certificationModal) {
+                closeCertificationModal();
+            }
         }
-
-        // Form validation
-        document.getElementById('personalInfoForm').addEventListener('submit', function(e) {
-            const firstName = document.getElementById('first_name').value.trim();
-            const lastName = document.getElementById('last_name').value.trim();
-            
-            if (firstName.length < 2) {
-                e.preventDefault();
-                alert('First name must be at least 2 characters long');
-                return;
-            }
-            
-            if (lastName.length < 2) {
-                e.preventDefault();
-                alert('Last name must be at least 2 characters long');
-                return;
-            }
-        });
-
-        // Auto-hide alerts
-        setTimeout(function() {
-            const alerts = document.querySelectorAll('.alert');
-            alerts.forEach(function(alert) {
-                alert.style.transition = 'opacity 0.5s';
-                alert.style.opacity = '0';
-                setTimeout(function() {
-                    alert.remove();
-                }, 500);
-            });
-        }, 5000);
 
         // Initialize on page load
         document.addEventListener('DOMContentLoaded', function() {
+            // Search functionality
+            const searchInput = document.getElementById('searchInput');
+            if (searchInput) {
+                searchInput.addEventListener('input', function() {
+                    const searchTerm = this.value.toLowerCase();
+                    const tableBody = document.getElementById('personalInfoTableBody');
+                    const rows = tableBody.getElementsByTagName('tr');
+
+                    for (let i = 0; i < rows.length; i++) {
+                        const row = rows[i];
+                        const text = row.textContent.toLowerCase();
+                        
+                        if (text.includes(searchTerm)) {
+                            row.style.display = '';
+                        } else {
+                            row.style.display = 'none';
+                        }
+                    }
+                });
+            }
+            
+            // Form validation
+            const personalInfoForm = document.getElementById('personalInfoForm');
+            if (personalInfoForm) {
+                personalInfoForm.addEventListener('submit', function(e) {
+                    const firstName = document.getElementById('first_name').value.trim();
+                    const lastName = document.getElementById('last_name').value.trim();
+                    
+                    if (firstName.length < 2) {
+                        e.preventDefault();
+                        alert('First name must be at least 2 characters long');
+                        return;
+                    }
+                    
+                    if (lastName.length < 2) {
+                        e.preventDefault();
+                        alert('Last name must be at least 2 characters long');
+                        return;
+                    }
+                });
+            }
+
             // Set max date for birth date (today)
             const today = new Date().toISOString().split('T')[0];
             const dateOfBirthInput = document.getElementById('date_of_birth');
@@ -1433,7 +1835,28 @@ $personalInfo = $stmt->fetchAll(PDO::FETCH_ASSOC);
                 const minDate = new Date();
                 minDate.setFullYear(minDate.getFullYear() - 120);
                 dateOfBirthInput.setAttribute('min', minDate.toISOString().split('T')[0]);
+                
+                // Live age calculation on birth date change
+                dateOfBirthInput.addEventListener('change', function() {
+                    const birthDate = this.value;
+                    if (birthDate) {
+                        const age = calculateAge(birthDate);
+                        console.log(`Age will be: ${age} years`);
+                    }
+                });
             }
+            
+            // Auto-hide alerts
+            setTimeout(function() {
+                const alerts = document.querySelectorAll('.alert');
+                alerts.forEach(function(alert) {
+                    alert.style.transition = 'opacity 0.5s';
+                    alert.style.opacity = '0';
+                    setTimeout(function() {
+                        alert.remove();
+                    }, 500);
+                });
+            }, 5000);
         });
 
         // Keyboard shortcuts
@@ -1442,6 +1865,8 @@ $personalInfo = $stmt->fetchAll(PDO::FETCH_ASSOC);
             if (e.key === 'Escape') {
                 closeModal();
                 closeViewModal();
+                closeEducationModal();
+                closeCertificationModal();
             }
             
             // Ctrl+N to add new person
@@ -1465,17 +1890,7 @@ $personalInfo = $stmt->fetchAll(PDO::FETCH_ASSOC);
             return age;
         }
 
-        // Live age calculation on birth date change
-        const dateOfBirthInput = document.getElementById('date_of_birth');
-        if (dateOfBirthInput) {
-            dateOfBirthInput.addEventListener('change', function() {
-                const birthDate = this.value;
-                if (birthDate) {
-                    const age = calculateAge(birthDate);
-                    console.log(`Age will be: ${age} years`);
-                }
-            });
-        }
+
 
         // Print PDS function
         function printPDS(personalInfoId) {
@@ -1735,15 +2150,15 @@ $personalInfo = $stmt->fetchAll(PDO::FETCH_ASSOC);
                         <td class="value">${e.year_graduated || 'N/A'}</td>
                     </tr>
                 `).join('') : ''}
-                ${person.highest_educational_attainment && !personEducation.some(e => e.education_level === person.highest_educational_attainment) ? `
+                ${person.highest_education_level && !personEducation.some(e => e.education_level === person.highest_education_level) ? `
                     <tr>
-                        <td class="value">${person.highest_educational_attainment}</td>
-                        <td class="value">${person.school_university || 'N/A'}</td>
-                        <td class="value">${person.course_degree || 'N/A'}</td>
-                        <td class="value">${person.year_graduated || 'N/A'}</td>
+                        <td class="value">${person.highest_education_level}</td>
+                        <td class="value">${person.institution_name || 'N/A'}</td>
+                        <td class="value">${person.field_of_study || 'N/A'}</td>
+                        <td class="value">${person.graduation_year || 'N/A'}</td>
                     </tr>
                 ` : ''}
-                ${personEducation.length === 0 && !person.highest_educational_attainment ? `
+                ${personEducation.length === 0 && !person.highest_education_level ? `
                     <tr>
                         <td class="value" colspan="4" style="text-align: center;">No educational background recorded</td>
                     </tr>
@@ -1760,8 +2175,8 @@ $personalInfo = $stmt->fetchAll(PDO::FETCH_ASSOC);
                 <td class="value">${person.tax_id || 'N/A'}</td>
             </tr>
             <tr>
-                <td class="label">18. SOCIAL SECURITY NUMBER (SSS)</td>
-                <td class="value">${person.social_security_number || 'N/A'}</td>
+                <td class="label">18. GOVERNMENT SERVICE INSURANCE SYSTEM (GSIS)</td>
+                <td class="value">${person.gsis_id || 'N/A'}</td>
             </tr>
             <tr>
                 <td class="label">19. PAG-IBIG ID</td>
@@ -1814,6 +2229,30 @@ $personalInfo = $stmt->fetchAll(PDO::FETCH_ASSOC);
                     </tr>
                 `).join('')}
             </tbody>
+        </table>
+    </div>
+    ` : ''}
+
+    ${person.certifications ? `
+    <div class="section">
+        <div class="section-title">VII. Professional Certifications</div>
+        <table class="info-table">
+            <tr>
+                <td class="label">Certifications</td>
+                <td class="value">${person.certifications.split(',').map(c => c.trim()).join('<br>')}</td>
+            </tr>
+        </table>
+    </div>
+    ` : ''}
+
+    ${person.additional_training ? `
+    <div class="section">
+        <div class="section-title">VIII. Additional Training</div>
+        <table class="info-table">
+            <tr>
+                <td class="label">Training Programs</td>
+                <td class="value">${person.additional_training.split(',').map(t => t.trim()).join('<br>')}</td>
+            </tr>
         </table>
     </div>
     ` : ''}

@@ -11,20 +11,10 @@ if (!isset($_SESSION['loggedin']) || $_SESSION['loggedin'] !== true) {
 }
 
 // Include database connection and helper functions
-require_once 'dp.php';
+require_once 'config.php';
 
-// Database connection
-$host = getenv('DB_HOST') ?? 'localhost';
-$dbname = getenv('DB_NAME') ?? 'hr_system';
-$username = getenv('DB_USER') ?? 'root';
-$password = getenv('DB_PASS') ?? '';
-
-try {
-    $pdo = new PDO("mysql:host=$host;dbname=$dbname", $username, $password);
-    $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
-} catch(PDOException $e) {
-    die("Connection failed: " . $e->getMessage());
-}
+// For backward compatibility with existing code
+$pdo = $conn;
 
 // Handle form submissions
 $message = '';
@@ -36,13 +26,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             case 'add':
                 // Add new employee
                 try {
-                    $stmt = $pdo->prepare("INSERT INTO employee_profiles (personal_info_id, job_role_id, employee_number, hire_date, employment_status, work_email, work_phone, location, remote_work) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)");
+                    $stmt = $pdo->prepare("INSERT INTO employee_profiles (personal_info_id, job_role_id, salary_grade_id, employee_number, hire_date, employment_status, current_salary, work_email, work_phone, location, remote_work) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
                     $stmt->execute([
                         $_POST['personal_info_id'],
                         $_POST['job_role_id'],
+                        isset($_POST['salary_grade_id']) && $_POST['salary_grade_id'] != '' ? $_POST['salary_grade_id'] : null,
                         $_POST['employee_number'],
                         $_POST['hire_date'],
                         $_POST['employment_status'],
+                        isset($_POST['current_salary']) ? $_POST['current_salary'] : 0,
                         $_POST['work_email'],
                         $_POST['work_phone'],
                         $_POST['location'],
@@ -59,13 +51,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             case 'update':
                 // Update employee
                 try {
-                    $stmt = $pdo->prepare("UPDATE employee_profiles SET personal_info_id=?, job_role_id=?, employee_number=?, hire_date=?, employment_status=?, work_email=?, work_phone=?, location=?, remote_work=? WHERE employee_id=?");
+                    $stmt = $pdo->prepare("UPDATE employee_profiles SET personal_info_id=?, job_role_id=?, salary_grade_id=?, employee_number=?, hire_date=?, employment_status=?, current_salary=?, work_email=?, work_phone=?, location=?, remote_work=? WHERE employee_id=?");
                     $stmt->execute([
                         $_POST['personal_info_id'],
                         $_POST['job_role_id'],
+                        isset($_POST['salary_grade_id']) && $_POST['salary_grade_id'] != '' ? $_POST['salary_grade_id'] : null,
                         $_POST['employee_number'],
                         $_POST['hire_date'],
                         $_POST['employment_status'],
+                        isset($_POST['current_salary']) ? $_POST['current_salary'] : 0,
                         $_POST['work_email'],
                         $_POST['work_phone'],
                         $_POST['location'],
@@ -162,10 +156,15 @@ $stmt = $pdo->query("
         pi.last_name,
         pi.phone_number,
         jr.title as job_title,
-        jr.department
+        jr.department,
+        sg.grade_name,
+        sg.grade_level,
+        sg.monthly_salary as grade_salary,
+        sg.description as salary_grade_description
     FROM employee_profiles ep
     LEFT JOIN personal_information pi ON ep.personal_info_id = pi.personal_info_id
     LEFT JOIN job_roles jr ON ep.job_role_id = jr.job_role_id
+    LEFT JOIN salary_grades sg ON ep.salary_grade_id = sg.grade_id
     ORDER BY ep.employee_id DESC
 ");
 $employees = $stmt->fetchAll(PDO::FETCH_ASSOC);
@@ -177,6 +176,121 @@ $personalInfo = $stmt->fetchAll(PDO::FETCH_ASSOC);
 // Fetch job roles for dropdown
 $stmt = $pdo->query("SELECT job_role_id, title, department FROM job_roles ORDER BY title");
 $jobRoles = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+// Fetch salary grades for dropdown
+$stmt = $pdo->query("SELECT grade_id, grade_name, grade_level, monthly_salary FROM salary_grades WHERE is_active = 1 ORDER BY grade_level ASC");
+$salaryGrades = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+// Fetch all personal information for viewing
+$stmt = $pdo->query("
+    SELECT pi.*,
+           CONCAT(pi.first_name, ' ', pi.last_name) as full_name,
+           TIMESTAMPDIFF(YEAR, pi.date_of_birth, CURDATE()) as age
+    FROM personal_information pi
+    ORDER BY pi.personal_info_id DESC
+");
+$allPersonalInfo = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+// Fetch employment history for viewing
+$stmt = $pdo->query("
+    SELECT 
+        eh.*,
+        CONCAT(pi.first_name, ' ', pi.last_name) as employee_name,
+        ep.employee_number,
+        d.department_name,
+        CONCAT(pi2.first_name, ' ', pi2.last_name) as manager_name
+    FROM employment_history eh
+    LEFT JOIN employee_profiles ep ON eh.employee_id = ep.employee_id
+    LEFT JOIN personal_information pi ON ep.personal_info_id = pi.personal_info_id
+    LEFT JOIN departments d ON eh.department_id = d.department_id
+    LEFT JOIN employee_profiles ep2 ON eh.reporting_manager_id = ep2.employee_id
+    LEFT JOIN personal_information pi2 ON ep2.personal_info_id = pi2.personal_info_id
+    ORDER BY eh.employee_id, eh.start_date DESC
+");
+$allEmploymentHistory = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+// Fetch all documents for viewing
+$stmt = $pdo->query("
+    SELECT 
+        dm.*,
+        CONCAT(pi.first_name, ' ', pi.last_name) as employee_name,
+        pi.first_name,
+        pi.last_name,
+        ep.employee_number,
+        jr.title as job_title,
+        jr.department,
+        CASE 
+            WHEN dm.expiry_date IS NOT NULL AND dm.expiry_date < CURDATE() THEN 'Expired'
+            WHEN dm.expiry_date IS NOT NULL AND dm.expiry_date <= DATE_ADD(CURDATE(), INTERVAL 30 DAY) THEN 'Expiring Soon'
+            ELSE 'Current'
+        END as expiry_status
+    FROM document_management dm
+    LEFT JOIN employee_profiles ep ON dm.employee_id = ep.employee_id
+    LEFT JOIN personal_information pi ON ep.personal_info_id = pi.personal_info_id
+    LEFT JOIN job_roles jr ON ep.job_role_id = jr.job_role_id
+    ORDER BY dm.created_at DESC
+");
+$allDocuments = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+// Fetch external employment history
+$stmt = $pdo->query("
+    SELECT eeh.*,
+        CONCAT(pi.first_name, ' ', pi.last_name) as employee_name,
+        ep.employee_number
+    FROM external_employment_history eeh
+    LEFT JOIN employee_profiles ep ON eeh.employee_id = ep.employee_id
+    LEFT JOIN personal_information pi ON ep.personal_info_id = pi.personal_info_id
+    ORDER BY eeh.start_date DESC
+");
+$externalHistory = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+// Fetch seminars & trainings
+$stmt = $pdo->query("
+    SELECT est.*,
+        CONCAT(pi.first_name, ' ', pi.last_name) as employee_name,
+        ep.employee_number
+    FROM employee_seminars_trainings est
+    LEFT JOIN employee_profiles ep ON est.employee_id = ep.employee_id
+    LEFT JOIN personal_information pi ON ep.personal_info_id = pi.personal_info_id
+    ORDER BY est.start_date DESC
+");
+$seminars = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+// Fetch licenses & certifications
+$stmt = $pdo->query("
+    SELECT elc.*,
+        CONCAT(pi.first_name, ' ', pi.last_name) as employee_name,
+        ep.employee_number
+    FROM employee_licenses_certifications elc
+    LEFT JOIN employee_profiles ep ON elc.employee_id = ep.employee_id
+    LEFT JOIN personal_information pi ON ep.personal_info_id = pi.personal_info_id
+    ORDER BY elc.date_issued DESC
+");
+$licenses = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+// Fetch awards & recognition
+$stmt = $pdo->query("
+    SELECT ear.*,
+        CONCAT(pi.first_name, ' ', pi.last_name) as employee_name,
+        ep.employee_number
+    FROM employee_awards_recognition ear
+    LEFT JOIN employee_profiles ep ON ear.employee_id = ep.employee_id
+    LEFT JOIN personal_information pi ON ep.personal_info_id = pi.personal_info_id
+    ORDER BY ear.date_received DESC
+");
+$awards = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+// Fetch voluntary work
+$stmt = $pdo->query("
+    SELECT evw.*,
+        CONCAT(pi.first_name, ' ', pi.last_name) as employee_name,
+        ep.employee_number
+    FROM employee_voluntary_work evw
+    LEFT JOIN employee_profiles ep ON evw.employee_id = ep.employee_id
+    LEFT JOIN personal_information pi ON ep.personal_info_id = pi.personal_info_id
+    ORDER BY evw.start_date DESC
+");
+$voluntaryWork = $stmt->fetchAll(PDO::FETCH_ASSOC);
 ?>
 
 <!DOCTYPE html>
@@ -380,6 +494,249 @@ $jobRoles = $stmt->fetchAll(PDO::FETCH_ASSOC);
             animation: slideIn 0.3s ease;
         }
 
+        .modal-content-large {
+            max-width: 750px;
+        }
+
+        .nav-buttons-section {
+            background: linear-gradient(135deg, var(--azure-blue-pale) 0%, #f0f0f0 100%);
+            padding: 25px;
+            border-radius: 10px;
+            margin-top: 20px;
+            border-left: 4px solid var(--azure-blue);
+        }
+
+        .nav-buttons-section h4 {
+            color: var(--azure-blue-dark);
+            margin-bottom: 15px;
+            font-weight: 600;
+        }
+
+        .nav-button-group {
+            display: flex;
+            gap: 12px;
+            flex-wrap: wrap;
+        }
+
+        .nav-button-group .btn {
+            flex: 1;
+            min-width: 140px;
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+        }
+
+        .info-section {
+            margin-bottom: 20px;
+        }
+
+        .info-section h5 {
+            color: var(--azure-blue-dark);
+            font-weight: 600;
+            margin-bottom: 12px;
+            border-bottom: 2px solid var(--azure-blue-lighter);
+            padding-bottom: 8px;
+        }
+
+        .info-row {
+            display: flex;
+            margin-bottom: 10px;
+        }
+
+        .info-label {
+            font-weight: 600;
+            color: var(--azure-blue-dark);
+            min-width: 150px;
+        }
+
+        .info-value {
+            color: #333;
+        }
+
+        /* Personal Information Grid Styling */
+        .info-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            margin-bottom: 25px;
+        }
+
+        .info-item {
+            background: linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%);
+            padding: 16px;
+            border-radius: 10px;
+            border-left: 4px solid var(--azure-blue);
+            transition: all 0.3s ease;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+        }
+
+        .info-item:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 5px 15px rgba(233, 30, 99, 0.15);
+        }
+
+        .info-item .info-label {
+            font-weight: 700;
+            color: var(--azure-blue-dark);
+            font-size: 13px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 8px;
+            display: block;
+        }
+
+        .info-item .info-value {
+            font-size: 15px;
+            color: #333;
+            word-break: break-word;
+        }
+
+        .section-divider {
+            height: 2px;
+            background: linear-gradient(90deg, transparent, var(--azure-blue-lighter), transparent);
+            margin: 30px 0;
+        }
+
+        .section-header {
+            font-size: 18px;
+            font-weight: 700;
+            color: var(--azure-blue-dark);
+            margin: 20px 0 15px 0;
+            padding-bottom: 10px;
+            border-bottom: 3px solid var(--azure-blue-lighter);
+            display: inline-block;
+        }
+
+        .document-type-badge {
+            display: inline-block;
+            padding: 6px 14px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 600;
+            background: #e3f2fd;
+            color: #1976d2;
+        }
+
+        .expiry-badge {
+            display: inline-block;
+            padding: 6px 14px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 600;
+        }
+
+        .expiry-current {
+            background: #d4edda;
+            color: #155724;
+        }
+
+        .expiry-expiring-soon {
+            background: #fff3cd;
+            color: #856404;
+        }
+
+        .expiry-expired {
+            background: #f8d7da;
+            color: #721c24;
+        }
+
+        /* Employment History Styling */
+        .history-container {
+            background: linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%);
+            border-radius: 12px;
+            padding: 25px;
+            margin-bottom: 25px;
+            border-left: 5px solid var(--azure-blue);
+            box-shadow: 0 3px 12px rgba(0, 0, 0, 0.08);
+        }
+
+        .history-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 30px;
+            margin-bottom: 25px;
+        }
+
+        .history-section {
+            padding: 20px;
+            background: white;
+            border-radius: 10px;
+            border-top: 3px solid var(--azure-blue-lighter);
+        }
+
+        .history-section h4 {
+            color: var(--azure-blue);
+            font-size: 16px;
+            font-weight: 700;
+            margin-bottom: 20px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid var(--azure-blue-lighter);
+        }
+
+        .history-item {
+            margin-bottom: 14px;
+            padding-bottom: 12px;
+            border-bottom: 1px solid #e9ecef;
+        }
+
+        .history-item:last-child {
+            border-bottom: none;
+            margin-bottom: 0;
+            padding-bottom: 0;
+        }
+
+        .history-item strong {
+            color: var(--azure-blue-dark);
+            display: block;
+            font-size: 13px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 5px;
+        }
+
+        .history-item p {
+            margin: 0;
+            color: #555;
+            font-size: 14px;
+            line-height: 1.5;
+        }
+
+        .history-full-section {
+            background: white;
+            border-radius: 10px;
+            padding: 20px;
+            margin-bottom: 20px;
+            border-left: 4px solid var(--azure-blue);
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+        }
+
+        .history-full-section h4 {
+            color: var(--azure-blue-dark);
+            font-size: 15px;
+            font-weight: 700;
+            margin: 0 0 12px 0;
+            padding: 0;
+            border: none;
+        }
+
+        .history-full-section p {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 8px;
+            line-height: 1.7;
+            color: #555;
+            margin: 0;
+            font-size: 14px;
+        }
+
+        @media (max-width: 1024px) {
+            .history-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
         @keyframes slideIn {
             from { transform: translateY(-50px); opacity: 0; }
             to { transform: translateY(0); opacity: 1; }
@@ -549,17 +906,9 @@ $jobRoles = $stmt->fetchAll(PDO::FETCH_ASSOC);
                                 <span class="search-icon">🔍</span>
                                 <input type="text" id="searchInput" placeholder="Search employees by name, email, or employee number...">
                             </div>
-                            <div style="display: flex; gap: 10px;">
-                                <button class="btn btn-primary" onclick="window.location.href='vacancy_management.php'">
-                                    <i class="fas fa-users-slash mr-1"></i>Vacancy Management
-                                </button>
-                                <button class="btn btn-primary" onclick="window.location.href='job_approval.php'">
-                                    ✅ Job Approval
-                                </button>
-                                <button class="btn btn-primary" onclick="openModal('add')">
-                                    ➕ Add New Employee
-                                </button>
-                            </div>
+                            <button class="btn btn-primary" onclick="openModal('add')">
+                                ➕ Add New Employee
+                            </button>
                         </div>
 
                         <div class="table-container">
@@ -572,6 +921,7 @@ $jobRoles = $stmt->fetchAll(PDO::FETCH_ASSOC);
                                         <th>Department</th>
                                         <th>Email</th>
                                         <th>Status</th>
+                                        <th>Salary Grade</th>
                                         <th>Hire Date</th>
                                         <th>Actions</th>
                                     </tr>
@@ -594,13 +944,25 @@ $jobRoles = $stmt->fetchAll(PDO::FETCH_ASSOC);
                                                 <?= htmlspecialchars($employee['employment_status']) ?>
                                             </span>
                                         </td>
+                                        <td>
+                                            <?php if ($employee['grade_name']): ?>
+                                                <span style="background: linear-gradient(135deg, var(--azure-blue-lighter) 0%, #e9ecef 100%); padding: 5px 12px; border-radius: 20px; font-weight: 600; color: var(--azure-blue-dark); font-size: 14px;">
+                                                    <?= htmlspecialchars($employee['grade_name']) ?>
+                                                </span>
+                                            <?php else: ?>
+                                                <span style="color: #999;">-</span>
+                                            <?php endif; ?>
+                                        </td>
                                         <td><?= date('M d, Y', strtotime($employee['hire_date'])) ?></td>
                                         <td>
+                                            <button class="btn btn-info btn-small" onclick="viewEmployeeDetails(<?= $employee['employee_id'] ?>)" title="View full profile">
+                                                👁️ View
+                                            </button>
                                             <button class="btn btn-warning btn-small" onclick="editEmployee(<?= $employee['employee_id'] ?>)">
                                                 ✏️ Edit
                                             </button>
-                                            <button class="btn btn-danger btn-small" onclick="deleteEmployee(<?= $employee['employee_id'] ?>)">
-                                                🗑️ Delete
+                                            <button class="btn btn-primary btn-small" onclick="deleteEmployee(<?= $employee['employee_id'] ?>)">
+                                                📦 Archive
                                             </button>
                                         </td>
                                     </tr>
@@ -618,6 +980,19 @@ $jobRoles = $stmt->fetchAll(PDO::FETCH_ASSOC);
                         </div>
                     </div>
                 </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- View Employee Details Modal -->
+    <div id="viewDetailsModal" class="modal">
+        <div class="modal-content modal-content-large">
+            <div class="modal-header">
+                <h2 id="detailsTitle">Employee Details</h2>
+                <span class="close" onclick="closeDetailsModal()">&times;</span>
+            </div>
+            <div class="modal-body" id="detailsContent">
+                <!-- Content will be populated by JavaScript -->
             </div>
         </div>
     </div>
@@ -693,6 +1068,26 @@ $jobRoles = $stmt->fetchAll(PDO::FETCH_ASSOC);
                     <div class="form-row">
                         <div class="form-col">
                             <div class="form-group">
+                                <label for="salary_grade_id">Salary Grade <span style="color: #999; font-size: 12px;">(Optional)</span></label>
+                                <select id="salary_grade_id" name="salary_grade_id" class="form-control" onchange="updateSalaryFromGrade()">
+                                    <option value="">Select salary grade...</option>
+                                    <?php foreach ($salaryGrades as $grade): ?>
+                                    <option value="<?= $grade['grade_id'] ?>" data-salary="<?= $grade['monthly_salary'] ?>"><?= htmlspecialchars($grade['grade_name']) ?> - Level <?= $grade['grade_level'] ?> (₱<?= number_format($grade['monthly_salary'], 2) ?>)</option>
+                                    <?php endforeach; ?>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="form-col">
+                            <div class="form-group">
+                                <label for="current_salary">Current Salary</label>
+                                <input type="number" id="current_salary" name="current_salary" class="form-control" step="0.01" min="0" placeholder="0.00">
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-col">
+                            <div class="form-group">
                                 <label for="work_email">Work Email</label>
                                 <input type="email" id="work_email" name="work_email" class="form-control">
                             </div>
@@ -729,6 +1124,17 @@ $jobRoles = $stmt->fetchAll(PDO::FETCH_ASSOC);
     <script>
         // Global variables
         let employeesData = <?= json_encode($employees) ?>;
+        let personalInfoData = <?= json_encode($allPersonalInfo) ?>;
+        let employmentHistoryData = <?= json_encode($allEmploymentHistory) ?>;
+        let documentsData = <?= json_encode($allDocuments) ?>;
+        let salaryGradesData = <?= json_encode($salaryGrades) ?>;
+        let externalHistoryData = <?= json_encode($externalHistory) ?>;
+        let seminarsData = <?= json_encode($seminars) ?>;
+        let licensesData = <?= json_encode($licenses) ?>;
+        let awardsData = <?= json_encode($awards) ?>;
+        let voluntaryWorkData = <?= json_encode($voluntaryWork) ?>;
+        let currentViewingEmployeeId = null;
+        let currentViewingDocumentId = null;
 
         // Search functionality
         document.getElementById('searchInput').addEventListener('input', function() {
@@ -777,6 +1183,113 @@ $jobRoles = $stmt->fetchAll(PDO::FETCH_ASSOC);
             document.body.style.overflow = 'auto';
         }
 
+        function closeDetailsModal() {
+            const modal = document.getElementById('viewDetailsModal');
+            modal.style.display = 'none';
+            document.body.style.overflow = 'auto';
+        }
+
+        function viewEmployeeDetails(employeeId) {
+            const employee = employeesData.find(emp => emp.employee_id == employeeId);
+            if (!employee) return;
+
+            currentViewingEmployeeId = employeeId;
+            const modal = document.getElementById('viewDetailsModal');
+            const title = document.getElementById('detailsTitle');
+            const content = document.getElementById('detailsContent');
+
+            title.textContent = `${employee.full_name} - Employee Profile`;
+
+            const hireDate = new Date(employee.hire_date).toLocaleDateString('en-US', { 
+                year: 'numeric', month: 'long', day: 'numeric' 
+            });
+
+            content.innerHTML = `
+                <div class="info-section">
+                    <h5>📋 Basic Information</h5>
+                    <div class="info-row">
+                        <span class="info-label">Full Name:</span>
+                        <span class="info-value">${employee.full_name}</span>
+                    </div>
+                    <div class="info-row">
+                        <span class="info-label">Employee Number:</span>
+                        <span class="info-value">${employee.employee_number}</span>
+                    </div>
+                    <div class="info-row">
+                        <span class="info-label">Email:</span>
+                        <span class="info-value">${employee.work_email || 'N/A'}</span>
+                    </div>
+                    <div class="info-row">
+                        <span class="info-label">Phone:</span>
+                        <span class="info-value">${employee.work_phone || 'N/A'}</span>
+                    </div>
+                </div>
+
+                <div class="info-section">
+                    <h5>💼 Employment Information</h5>
+                    <div class="info-row">
+                        <span class="info-label">Job Title:</span>
+                        <span class="info-value">${employee.job_title || 'N/A'}</span>
+                    </div>
+                    <div class="info-row">
+                        <span class="info-label">Department:</span>
+                        <span class="info-value">${employee.department || 'N/A'}</span>
+                    </div>
+                    <div class="info-row">
+                        <span class="info-label">Status:</span>
+                        <span class="info-value"><span class="status-badge status-${employee.employment_status.toLowerCase() === 'full-time' ? 'active' : 'inactive'}">${employee.employment_status}</span></span>
+                    </div>
+                    <div class="info-row">
+                        <span class="info-label">Hire Date:</span>
+                        <span class="info-value">${hireDate}</span>
+                    </div>
+                    <div class="info-row">
+                        <span class="info-label">Location:</span>
+                        <span class="info-value">${employee.location || 'N/A'}</span>
+                    </div>
+                    <div class="info-row">
+                        <span class="info-label">Remote Work:</span>
+                        <span class="info-value">${employee.remote_work == 1 ? '✅ Enabled' : '❌ Not Enabled'}</span>
+                    </div>
+                </div>
+
+                <div class="info-section">
+                    <h5>💰 Salary & Compensation</h5>
+                    <div class="info-row">
+                        <span class="info-label">Salary Grade:</span>
+                        <span class="info-value">${employee.grade_name ? `<span style="background: linear-gradient(135deg, var(--azure-blue-lighter) 0%, #e9ecef 100%); padding: 5px 12px; border-radius: 20px; font-weight: 600; color: var(--azure-blue-dark);">${employee.grade_name} (Level ${employee.grade_level})</span>` : 'Not Assigned'}</span>
+                    </div>
+                    <div class="info-row">
+                        <span class="info-label">Current Salary:</span>
+                        <span class="info-value">₱ ${parseFloat(employee.current_salary).toLocaleString('en-PH', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span>
+                    </div>
+                    ${employee.grade_salary ? `<div class="info-row">
+                        <span class="info-label">Grade Base Salary:</span>
+                        <span class="info-value">₱ ${parseFloat(employee.grade_salary).toLocaleString('en-PH', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span>
+                    </div>` : ''}
+                </div>
+
+                <div class="nav-buttons-section">
+                    <h4>📁 Related Information</h4>
+                    <p style="color: #666; margin-bottom: 15px; font-size: 14px;">Access detailed records for this employee:</p>
+                    <div class="nav-button-group">
+                        <button onclick="viewPersonalInfo(${employee.personal_info_id})" class="btn btn-info" title="View personal information">
+                            👤 Personal Information
+                        </button>
+                        <button onclick="viewEmploymentHistory(${employee.employee_id})" class="btn btn-success" title="View employment history">
+                            📊 Employment History
+                        </button>
+                        <button onclick="viewDocumentsFromProfile(${employee.employee_id})" class="btn btn-primary" title="View documents">
+                            📄 Documents
+                        </button>
+                    </div>
+                </div>
+            `;
+
+            modal.style.display = 'block';
+            document.body.style.overflow = 'hidden';
+        }
+
         function populateEditForm(employeeId) {
             // This would typically fetch data via AJAX
             // For now, we'll use the existing data
@@ -791,6 +1304,19 @@ $jobRoles = $stmt->fetchAll(PDO::FETCH_ASSOC);
                 document.getElementById('work_phone').value = employee.work_phone || '';
                 document.getElementById('location').value = employee.location || '';
                 document.getElementById('remote_work').checked = employee.remote_work == 1;
+                document.getElementById('salary_grade_id').value = employee.salary_grade_id || '';
+                document.getElementById('current_salary').value = employee.current_salary || '';
+            }
+        }
+
+        // Function to update salary when grade is selected
+        function updateSalaryFromGrade() {
+            const gradeSelect = document.getElementById('salary_grade_id');
+            const salaryInput = document.getElementById('current_salary');
+            const selectedOption = gradeSelect.options[gradeSelect.selectedIndex];
+            
+            if (selectedOption && selectedOption.dataset.salary) {
+                salaryInput.value = selectedOption.dataset.salary;
             }
         }
 
@@ -811,11 +1337,526 @@ $jobRoles = $stmt->fetchAll(PDO::FETCH_ASSOC);
             }
         }
 
+        // View Personal Information for employee
+        function viewPersonalInfo(personalInfoId) {
+            const person = personalInfoData.find(p => p.personal_info_id == personalInfoId);
+            if (!person) {
+                alert('Personal information not found');
+                return;
+            }
+
+            const modal = document.getElementById('viewDetailsModal');
+            const title = document.getElementById('detailsTitle');
+            const content = document.getElementById('detailsContent');
+
+            title.textContent = `${person.full_name} - Personal Information`;
+
+            let html = `
+                <div class="info-grid">
+                    <div class="info-item">
+                        <div class="info-label">Full Name</div>
+                        <div class="info-value">${person.first_name} ${person.last_name}</div>
+                    </div>
+                    <div class="info-item">
+                        <div class="info-label">Date of Birth</div>
+                        <div class="info-value">${person.date_of_birth ? new Date(person.date_of_birth).toLocaleDateString() : 'N/A'}</div>
+                    </div>
+                    <div class="info-item">
+                        <div class="info-label">Age</div>
+                        <div class="info-value">${person.age} years</div>
+                    </div>
+                    <div class="info-item">
+                        <div class="info-label">Gender</div>
+                        <div class="info-value">${person.gender || 'N/A'}</div>
+                    </div>
+                    <div class="info-item">
+                        <div class="info-label">Nationality</div>
+                        <div class="info-value">${person.nationality || 'N/A'}</div>
+                    </div>
+                    <div class="info-item">
+                        <div class="info-label">Phone Number</div>
+                        <div class="info-value">${person.phone_number || 'N/A'}</div>
+                    </div>
+                    <div class="info-item">
+                        <div class="info-label">Tax ID</div>
+                        <div class="info-value">${person.tax_id || 'N/A'}</div>
+                    </div>
+                    <div class="info-item">
+                        <div class="info-label">GSIS ID</div>
+                        <div class="info-value">${person.gsis_id || 'N/A'}</div>
+                    </div>
+                    <div class="info-item">
+                        <div class="info-label">Pag-IBIG ID</div>
+                        <div class="info-value">${person.pag_ibig_id || 'N/A'}</div>
+                    </div>
+                    <div class="info-item">
+                        <div class="info-label">PhilHealth ID</div>
+                        <div class="info-value">${person.philhealth_id || 'N/A'}</div>
+                    </div>
+                </div>
+
+                <div class="section-divider"></div>
+                <div class="section-header">💍 Marital Status</div>
+                <div class="info-grid">
+                    <div class="info-item">
+                        <div class="info-label">Status</div>
+                        <div class="info-value">${person.marital_status || 'N/A'}</div>
+                    </div>
+                    <div class="info-item">
+                        <div class="info-label">Status Date</div>
+                        <div class="info-value">${person.marital_status_date ? new Date(person.marital_status_date).toLocaleDateString() : 'N/A'}</div>
+                    </div>
+                </div>
+
+                <div class="section-divider"></div>
+                <div class="section-header">🚨 Emergency Contact</div>
+                <div class="info-grid">
+                    <div class="info-item">
+                        <div class="info-label">Name</div>
+                        <div class="info-value">${person.emergency_contact_name || 'N/A'}</div>
+                    </div>
+                    <div class="info-item">
+                        <div class="info-label">Relationship</div>
+                        <div class="info-value">${person.emergency_contact_relationship || 'N/A'}</div>
+                    </div>
+                    <div class="info-item">
+                        <div class="info-label">Phone</div>
+                        <div class="info-value">${person.emergency_contact_phone || 'N/A'}</div>
+                    </div>
+                </div>
+
+                <div class="section-divider"></div>
+                <div class="section-header">🎓 Education</div>
+                ${person.highest_education_level ? `
+                    <div class="info-grid">
+                        <div class="info-item">
+                            <div class="info-label">Highest Attainment</div>
+                            <div class="info-value">${person.highest_education_level}</div>
+                        </div>
+                        <div class="info-item">
+                            <div class="info-label">Course/Degree</div>
+                            <div class="info-value">${person.field_of_study || 'N/A'}</div>
+                        </div>
+                        <div class="info-item">
+                            <div class="info-label">School/University</div>
+                            <div class="info-value">${person.institution_name || 'N/A'}</div>
+                        </div>
+                        <div class="info-item">
+                            <div class="info-label">Year Graduated</div>
+                            <div class="info-value">${person.graduation_year || 'N/A'}</div>
+                        </div>
+                    </div>
+                ` : '<p>No education information recorded.</p>'}
+
+                ${person.certifications ? `
+                    <div class="section-divider"></div>
+                    <div class="section-header">🏆 Professional Certifications</div>
+                    <div class="info-item">
+                        <div style="line-height: 1.8; color: #333;">
+                            ${person.certifications.split(',').map(cert => '<div>• ' + cert.trim() + '</div>').join('')}
+                        </div>
+                    </div>
+                ` : ''}
+
+                <div class="nav-buttons-section">
+                    <h4>📋 Related Information</h4>
+                    <p style="color: #666; margin-bottom: 15px; font-size: 14px;">Access related records for this person:</p>
+                    <div class="nav-button-group">
+                        <button onclick="viewEmploymentHistory(${currentViewingEmployeeId})" class="btn btn-success" title="View employment history">
+                            📊 Employment History
+                        </button>
+                        <button onclick="viewDocumentsFromProfile(${currentViewingEmployeeId})" class="btn btn-primary" title="View documents">
+                            📄 Documents
+                        </button>
+                        <button onclick="backToEmployeeProfile()" class="btn btn-info" title="Back to employee profile">
+                            👨‍💼 Back to Profile
+                        </button>
+                    </div>
+                </div>
+            `;
+
+            content.innerHTML = html;
+        }
+
+        // View Employment History for employee
+        function viewEmploymentHistory(employeeId) {
+            const histories = employmentHistoryData.filter(h => h.employee_id == employeeId);
+            const external = externalHistoryData.filter(e => e.employee_id == employeeId);
+            const seminars = seminarsData.filter(s => s.employee_id == employeeId);
+            const licenses = licensesData.filter(l => l.employee_id == employeeId);
+            const awards = awardsData.filter(a => a.employee_id == employeeId);
+            const voluntary = voluntaryWorkData.filter(v => v.employee_id == employeeId);
+            
+            if (histories.length === 0 && external.length === 0 && seminars.length === 0 && 
+                licenses.length === 0 && awards.length === 0 && voluntary.length === 0) {
+                alert('No employment history found for this employee');
+                return;
+            }
+
+            const modal = document.getElementById('viewDetailsModal');
+            const title = document.getElementById('detailsTitle');
+            const content = document.getElementById('detailsContent');
+
+            const employee = employeesData.find(e => e.employee_id == employeeId);
+            title.textContent = `${employee?.full_name || 'Employee'} - Complete Employment History`;
+
+            let html = '<div style="padding: 20px;">';
+            const fmt = d => d ? new Date(d).toLocaleDateString('en-US', {year:'numeric',month:'long',day:'numeric'}) : '—';
+            const peso = v => v ? '₱' + parseFloat(v).toLocaleString('en-US',{minimumFractionDigits:2}) : '—';
+
+            // INTERNAL EMPLOYMENT HISTORY SECTION
+            if (histories.length > 0) {
+                html += `<div style="font-size:18px;font-weight:700;color:var(--azure-blue-dark);margin:25px 0 20px 0;padding-bottom:12px;border-bottom:3px solid var(--azure-blue-lighter);display:inline-block;">📋 Internal Employment History</div>`;
+                
+                histories.forEach((history, index) => {
+                    const total = (parseFloat(history.base_salary||0)+parseFloat(history.allowances||0)+parseFloat(history.bonuses||0)+parseFloat(history.salary_adjustments||0));
+                    html += `
+                        <div style="background:white;border-radius:12px;padding:24px;margin-bottom:25px;box-shadow:0 3px 12px rgba(0,0,0,0.08);">
+                            <div style="display:grid;grid-template-columns:1fr 1fr;gap:24px;margin-bottom:28px;">
+                                <div style="background:linear-gradient(135deg,#f0f4ff 0%,#f8faff 100%);padding:20px;border-radius:10px;border-left:5px solid var(--azure-blue);">
+                                    <h5 style="color:var(--azure-blue-dark);margin:0 0 16px 0;font-weight:700;font-size:14px;text-transform:uppercase;letter-spacing:0.5px;">📋 Position (Record #${index + 1})</h5>
+                                    <div style="display:grid;gap:14px;">
+                                        <div style="border-bottom:1px solid rgba(233,30,99,0.1);padding-bottom:12px;"><span style="font-size:11px;text-transform:uppercase;color:#999;font-weight:700;">Job Title</span><p style="margin:4px 0 0 0;font-size:14px;color:#333;">${history.job_title||'—'}</p></div>
+                                        <div style="border-bottom:1px solid rgba(233,30,99,0.1);padding-bottom:12px;"><span style="font-size:11px;text-transform:uppercase;color:#999;font-weight:700;">Department</span><p style="margin:4px 0 0 0;font-size:14px;color:#333;">${history.department_name||'—'}</p></div>
+                                        <div style="border-bottom:1px solid rgba(233,30,99,0.1);padding-bottom:12px;"><span style="font-size:11px;text-transform:uppercase;color:#999;font-weight:700;">Employment Type</span><p style="margin:4px 0 0 0;font-size:14px;color:#333;">${history.employment_type||'—'}</p></div>
+                                        <div style="border-bottom:1px solid rgba(233,30,99,0.1);padding-bottom:12px;"><span style="font-size:11px;text-transform:uppercase;color:#999;font-weight:700;">Salary Grade</span><p style="margin:4px 0 0 0;font-size:14px;color:#333;">${history.salary_grade||'—'}</p></div>
+                                        <div><span style="font-size:11px;text-transform:uppercase;color:#999;font-weight:700;">Location</span><p style="margin:4px 0 0 0;font-size:14px;color:#333;">${history.location||'—'}</p></div>
+                                    </div>
+                                </div>
+                                <div style="background:linear-gradient(135deg,#fff5e6 0%,#fffaf2 100%);padding:20px;border-radius:10px;border-left:5px solid #ffc107;">
+                                    <h5 style="color:#b89c3a;margin:0 0 16px 0;font-weight:700;font-size:14px;text-transform:uppercase;letter-spacing:0.5px;">💰 Compensation</h5>
+                                    <div style="display:grid;gap:14px;">
+                                        <div style="border-bottom:1px solid rgba(255,193,7,0.1);padding-bottom:12px;"><span style="font-size:11px;text-transform:uppercase;color:#999;font-weight:700;">Base Salary</span><p style="margin:4px 0 0 0;font-size:14px;color:#333;font-weight:600;">${peso(history.base_salary)}</p></div>
+                                        <div style="border-bottom:1px solid rgba(255,193,7,0.1);padding-bottom:12px;"><span style="font-size:11px;text-transform:uppercase;color:#999;font-weight:700;">Allowances</span><p style="margin:4px 0 0 0;font-size:14px;color:#333;">${peso(history.allowances)}</p></div>
+                                        <div style="border-bottom:1px solid rgba(255,193,7,0.1);padding-bottom:12px;"><span style="font-size:11px;text-transform:uppercase;color:#999;font-weight:700;">Bonuses</span><p style="margin:4px 0 0 0;font-size:14px;color:#333;">${peso(history.bonuses)}</p></div>
+                                        <div style="border-bottom:1px solid rgba(255,193,7,0.1);padding-bottom:12px;"><span style="font-size:11px;text-transform:uppercase;color:#999;font-weight:700;">Adjustments</span><p style="margin:4px 0 0 0;font-size:14px;color:#333;">${peso(history.salary_adjustments)}</p></div>
+                                        <div><span style="font-size:11px;text-transform:uppercase;color:#999;font-weight:700;">Total</span><p style="margin:4px 0 0 0;font-size:15px;color:#333;font-weight:700;">${peso(total)}</p></div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div style="height:2px;background:linear-gradient(90deg,transparent,var(--azure-blue-lighter),transparent);margin:28px 0;"></div>
+                            <div style="display:grid;grid-template-columns:1fr 1fr;gap:24px;">
+                                <div style="background:#f0f7ff;padding:18px;border-radius:10px;border-left:5px solid #17a2b8;">
+                                    <h5 style="color:#0c5460;margin:0 0 12px 0;font-weight:700;font-size:13px;text-transform:uppercase;">📅 Employment Period & Status</h5>
+                                    <div style="display:grid;gap:12px;">
+                                        <div><span style="font-size:11px;text-transform:uppercase;color:#999;font-weight:700;">Start Date</span><p style="margin:4px 0 0 0;font-size:14px;color:#333;">${fmt(history.start_date)}</p></div>
+                                        <div><span style="font-size:11px;text-transform:uppercase;color:#999;font-weight:700;">End Date</span><p style="margin:4px 0 0 0;font-size:14px;color:#333;">${history.end_date ? fmt(history.end_date) : '<span style="color:var(--azure-blue);">Currently Employed</span>'}</p></div>
+                                        <div><span style="font-size:11px;text-transform:uppercase;color:#999;font-weight:700;">Status</span><p style="margin:4px 0 0 0;font-size:14px;color:#333;">${history.employment_status||'—'}</p></div>
+                                        <div><span style="font-size:11px;text-transform:uppercase;color:#999;font-weight:700;">Manager</span><p style="margin:4px 0 0 0;font-size:14px;color:#333;">${history.manager_name||'—'}</p></div>
+                                    </div>
+                                </div>
+                                <div style="background:#fff0f8;padding:18px;border-radius:10px;border-left:5px solid var(--azure-blue);">
+                                    <h5 style="color:var(--azure-blue-dark);margin:0 0 12px 0;font-weight:700;font-size:13px;text-transform:uppercase;">📝 Additional Info</h5>
+                                    <div style="display:grid;gap:12px;">
+                                        <div><span style="font-size:11px;text-transform:uppercase;color:#999;font-weight:700;">Promotion Type</span><p style="margin:4px 0 0 0;font-size:14px;color:#333;">${history.promotion_type||'—'}</p></div>
+                                        <div><span style="font-size:11px;text-transform:uppercase;color:#999;font-weight:700;">Position Sequence</span><p style="margin:4px 0 0 0;font-size:14px;color:#333;">${history.position_sequence||'—'}</p></div>
+                                        <div><span style="font-size:11px;text-transform:uppercase;color:#999;font-weight:700;">Previous Salary</span><p style="margin:4px 0 0 0;font-size:14px;color:#333;">${peso(history.previous_salary)}</p></div>
+                                        <div><span style="font-size:11px;text-transform:uppercase;color:#999;font-weight:700;">Change Reason</span><p style="margin:4px 0 0 0;font-size:13px;color:#333;">${history.reason_for_change||'—'}</p></div>
+                                    </div>
+                                </div>
+                            </div>
+                            ${history.duties_responsibilities ? `<div style="background:#f8f9fa;padding:18px;border-radius:10px;border-left:5px solid #007bff;margin-top:24px;"><h5 style="color:#004085;margin:0 0 12px 0;font-weight:700;font-size:13px;text-transform:uppercase;">📋 Duties & Responsibilities</h5><p style="margin:0;color:#555;font-size:14px;line-height:1.7;">${history.duties_responsibilities}</p></div>` : ''}
+                            ${history.remarks ? `<div style="background:#f5f9ff;padding:18px;border-radius:10px;border-left:5px solid #17a2b8;margin-top:20px;"><h5 style="color:#0c5460;margin:0 0 12px 0;font-weight:700;font-size:13px;text-transform:uppercase;">📌 Remarks</h5><p style="margin:0;color:#555;font-size:14px;line-height:1.7;">${history.remarks}</p></div>` : ''}
+                        </div>
+                    `;
+                });
+            }
+
+            // EXTERNAL WORK EXPERIENCE SECTION
+            if (external.length > 0) {
+                html += `<div style="font-size:18px;font-weight:700;color:var(--azure-blue-dark);margin:35px 0 20px 0;padding-bottom:12px;border-bottom:3px solid var(--azure-blue-lighter);display:inline-block;">💼 Work Experience (External)</div>`;
+                external.forEach((exp, index) => {
+                    html += `
+                        <div style="background:white;border-radius:12px;padding:24px;margin-bottom:25px;box-shadow:0 3px 12px rgba(0,0,0,0.08);">
+                            <div style="display:grid;grid-template-columns:1fr 1fr;gap:24px;margin-bottom:28px;">
+                                <div style="background:linear-gradient(135deg,#f0f4ff 0%,#f8faff 100%);padding:20px;border-radius:10px;border-left:5px solid #1976d2;">
+                                    <h5 style="color:#1565c0;margin:0 0 16px 0;font-weight:700;font-size:14px;text-transform:uppercase;letter-spacing:0.5px;">🏢 Employer Details</h5>
+                                    <div style="display:grid;gap:14px;">
+                                        <div style="border-bottom:1px solid rgba(25,118,210,0.1);padding-bottom:12px;"><span style="font-size:11px;text-transform:uppercase;color:#999;font-weight:700;">Employer</span><p style="margin:4px 0 0 0;font-size:15px;color:#333;font-weight:600;">${exp.employer_name||'—'}</p></div>
+                                        <div style="border-bottom:1px solid rgba(25,118,210,0.1);padding-bottom:12px;"><span style="font-size:11px;text-transform:uppercase;color:#999;font-weight:700;">Type</span><p style="margin:4px 0 0 0;font-size:14px;color:#333;">${exp.employer_type||'—'}</p></div>
+                                        <div style="border-bottom:1px solid rgba(25,118,210,0.1);padding-bottom:12px;"><span style="font-size:11px;text-transform:uppercase;color:#999;font-weight:700;">Address</span><p style="margin:4px 0 0 0;font-size:14px;color:#333;">${exp.employer_address||'—'}</p></div>
+                                        <div style="border-bottom:1px solid rgba(25,118,210,0.1);padding-bottom:12px;"><span style="font-size:11px;text-transform:uppercase;color:#999;font-weight:700;">Department</span><p style="margin:4px 0 0 0;font-size:14px;color:#333;">${exp.department_or_division||'—'}</p></div>
+                                        <div><span style="font-size:11px;text-transform:uppercase;color:#999;font-weight:700;">Years of Experience</span><p style="margin:4px 0 0 0;font-size:14px;color:#333;">${exp.years_of_experience ? exp.years_of_experience+' years' : '—'}</p></div>
+                                    </div>
+                                </div>
+                                <div style="background:linear-gradient(135deg,#fff5f0 0%,#fffaf8 100%);padding:20px;border-radius:10px;border-left:5px solid #fd7e14;">
+                                    <h5 style="color:#b85116;margin:0 0 16px 0;font-weight:700;font-size:14px;text-transform:uppercase;letter-spacing:0.5px;">💼 Position & Duration</h5>
+                                    <div style="display:grid;gap:14px;">
+                                        <div style="border-bottom:1px solid rgba(253,126,20,0.1);padding-bottom:12px;"><span style="font-size:11px;text-transform:uppercase;color:#999;font-weight:700;">Job Title</span><p style="margin:4px 0 0 0;font-size:15px;color:#333;font-weight:600;">${exp.job_title||'—'}</p></div>
+                                        <div style="border-bottom:1px solid rgba(253,126,20,0.1);padding-bottom:12px;"><span style="font-size:11px;text-transform:uppercase;color:#999;font-weight:700;">Employment Type</span><p style="margin:4px 0 0 0;font-size:14px;color:#333;">${exp.employment_type||'—'}</p></div>
+                                        <div style="border-bottom:1px solid rgba(253,126,20,0.1);padding-bottom:12px;"><span style="font-size:11px;text-transform:uppercase;color:#999;font-weight:700;">Period</span><p style="margin:4px 0 0 0;font-size:14px;color:#333;font-weight:600;">${fmt(exp.start_date)} – ${exp.end_date ? fmt(exp.end_date) : '<span style="color:var(--azure-blue);">Present</span>'}</p></div>
+                                        <div style="border-bottom:1px solid rgba(253,126,20,0.1);padding-bottom:12px;"><span style="font-size:11px;text-transform:uppercase;color:#999;font-weight:700;">Monthly Salary</span><p style="margin:4px 0 0 0;font-size:14px;color:#333;font-weight:600;">${peso(exp.monthly_salary)} <span style="color:#999;font-size:12px;">${exp.currency||'PHP'}</span></p></div>
+                                        <div><span style="font-size:11px;text-transform:uppercase;color:#999;font-weight:700;">Reason for Leaving</span><p style="margin:4px 0 0 0;font-size:13px;color:#333;">${exp.reason_for_leaving || 'Not specified'}</p></div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div style="height:2px;background:linear-gradient(90deg,transparent,var(--azure-blue-lighter),transparent);margin:28px 0;"></div>
+                            <div style="display:grid;grid-template-columns:1fr 1fr;gap:24px;">
+                                <div style="background:#f0fff4;padding:18px;border-radius:10px;border-left:5px solid #28a745;">
+                                    <h5 style="color:#1e7e34;margin:0 0 12px 0;font-weight:700;font-size:13px;text-transform:uppercase;">👨‍💼 Supervisor & Reference</h5>
+                                    <div style="display:grid;gap:12px;">
+                                        <div><span style="font-size:11px;text-transform:uppercase;color:#999;font-weight:700;">Supervisor</span><p style="margin:4px 0 0 0;font-size:14px;color:#333;">${exp.immediate_supervisor||'—'}</p></div>
+                                        <div><span style="font-size:11px;text-transform:uppercase;color:#999;font-weight:700;">Contact</span><p style="margin:4px 0 0 0;font-size:14px;color:#333;">${exp.supervisor_contact||'—'}</p></div>
+                                        <div><span style="font-size:11px;text-transform:uppercase;color:#999;font-weight:700;">Reference Available</span><p style="margin:4px 0 0 0;font-size:14px;color:#333;">${exp.reference_available == 1 ? '<span style="color:var(--azure-blue);font-weight:600;">✓ Yes</span>' : 'No'}</p></div>
+                                        <div><span style="font-size:11px;text-transform:uppercase;color:#999;font-weight:700;">Verified</span><p style="margin:4px 0 0 0;font-size:14px;color:#333;">${exp.verified == 1 ? '<span style="color:#28a745;font-weight:600;">✓ Verified</span>' : '<span style="color:#ffc107;font-weight:600;">Pending</span>'}</p></div>
+                                    </div>
+                                </div>
+                            </div>
+                            ${exp.key_responsibilities ? `<div style="background:#f8f9fa;padding:18px;border-radius:10px;border-left:5px solid #007bff;margin-top:24px;"><h5 style="color:#004085;margin:0 0 12px 0;font-weight:700;font-size:13px;text-transform:uppercase;">📋 Key Responsibilities</h5><p style="margin:0;color:#555;font-size:14px;line-height:1.7;">${exp.key_responsibilities}</p></div>` : ''}
+                            ${exp.achievements ? `<div style="background:#fff8e1;padding:18px;border-radius:10px;border-left:5px solid #ffc107;margin-top:20px;"><h5 style="color:#7e6008;margin:0 0 12px 0;font-weight:700;font-size:13px;text-transform:uppercase;">🏆 Achievements</h5><p style="margin:0;color:#555;font-size:14px;line-height:1.7;">${exp.achievements}</p></div>` : ''}
+                            ${exp.skills_gained ? `<div style="background:#e7f3ff;padding:18px;border-radius:10px;border-left:5px solid #1976d2;margin-top:20px;"><h5 style="color:#1565c0;margin:0 0 12px 0;font-weight:700;font-size:13px;text-transform:uppercase;">💡 Skills Gained</h5><p style="margin:0;color:#555;font-size:14px;line-height:1.7;">${exp.skills_gained}</p></div>` : ''}
+                        </div>
+                    `;
+                });
+            }
+
+            // SEMINARS & TRAININGS SECTION
+            if (seminars.length > 0) {
+                html += `<div style="font-size:18px;font-weight:700;color:var(--azure-blue-dark);margin:35px 0 20px 0;padding-bottom:12px;border-bottom:3px solid var(--azure-blue-lighter);display:inline-block;">🎓 Seminars & Trainings</div>`;
+                seminars.forEach((sem, index) => {
+                    html += `
+                        <div style="background:white;border-radius:12px;padding:24px;margin-bottom:25px;box-shadow:0 3px 12px rgba(0,0,0,0.08);">
+                            <div style="display:grid;grid-template-columns:1fr 1fr;gap:24px;margin-bottom:28px;">
+                                <div style="background:linear-gradient(135deg,#e0f7fa 0%,#f1f8f9 100%);padding:20px;border-radius:10px;border-left:5px solid #17a2b8;">
+                                    <h5 style="color:#0c5460;margin:0 0 16px 0;font-weight:700;font-size:14px;text-transform:uppercase;letter-spacing:0.5px;">🎓 Training Information</h5>
+                                    <div style="display:grid;gap:14px;">
+                                        <div style="border-bottom:1px solid rgba(23,162,184,0.1);padding-bottom:12px;"><span style="font-size:11px;text-transform:uppercase;color:#999;font-weight:700;">Title</span><p style="margin:4px 0 0 0;font-size:15px;color:#333;font-weight:600;">${sem.title||'—'}</p></div>
+                                        <div style="border-bottom:1px solid rgba(23,162,184,0.1);padding-bottom:12px;"><span style="font-size:11px;text-transform:uppercase;color:#999;font-weight:700;">Category</span><p style="margin:4px 0 0 0;font-size:14px;color:#333;">${sem.category||'—'}</p></div>
+                                        <div style="border-bottom:1px solid rgba(23,162,184,0.1);padding-bottom:12px;"><span style="font-size:11px;text-transform:uppercase;color:#999;font-weight:700;">Organizer</span><p style="margin:4px 0 0 0;font-size:14px;color:#333;">${sem.organizer||'—'}</p></div>
+                                        <div style="border-bottom:1px solid rgba(23,162,184,0.1);padding-bottom:12px;"><span style="font-size:11px;text-transform:uppercase;color:#999;font-weight:700;">Venue</span><p style="margin:4px 0 0 0;font-size:14px;color:#333;">${sem.venue||'—'}</p></div>
+                                        <div><span style="font-size:11px;text-transform:uppercase;color:#999;font-weight:700;">Modality</span><p style="margin:4px 0 0 0;font-size:14px;color:#333;">${sem.modality||'—'}</p></div>
+                                    </div>
+                                </div>
+                                <div style="background:linear-gradient(135deg,#fff3e0 0%,#fffaf5 100%);padding:20px;border-radius:10px;border-left:5px solid #ffc107;">
+                                    <h5 style="color:#b89c3a;margin:0 0 16px 0;font-weight:700;font-size:14px;text-transform:uppercase;letter-spacing:0.5px;">📜 Duration & Dates</h5>
+                                    <div style="display:grid;gap:14px;">
+                                        <div style="border-bottom:1px solid rgba(255,193,7,0.1);padding-bottom:12px;"><span style="font-size:11px;text-transform:uppercase;color:#999;font-weight:700;">Duration</span><p style="margin:4px 0 0 0;font-size:15px;color:#333;font-weight:600;">${sem.duration_hours ? sem.duration_hours+' hours' : '—'}</p></div>
+                                        <div style="border-bottom:1px solid rgba(255,193,7,0.1);padding-bottom:12px;"><span style="font-size:11px;text-transform:uppercase;color:#999;font-weight:700;">Start Date</span><p style="margin:4px 0 0 0;font-size:14px;color:#333;">${fmt(sem.start_date)}</p></div>
+                                        <div style="border-bottom:1px solid rgba(255,193,7,0.1);padding-bottom:12px;"><span style="font-size:11px;text-transform:uppercase;color:#999;font-weight:700;">End Date</span><p style="margin:4px 0 0 0;font-size:14px;color:#333;">${sem.end_date&&sem.end_date!==sem.start_date?fmt(sem.end_date):'Same as Start'}</p></div>
+                                        <div style="border-bottom:1px solid rgba(255,193,7,0.1);padding-bottom:12px;"><span style="font-size:11px;text-transform:uppercase;color:#999;font-weight:700;">Funded By</span><p style="margin:4px 0 0 0;font-size:14px;color:#333;">${sem.funded_by||'—'}</p></div>
+                                        <div><span style="font-size:11px;text-transform:uppercase;color:#999;font-weight:700;">Amount Spent</span><p style="margin:4px 0 0 0;font-size:14px;color:#333;font-weight:600;">₱${parseFloat(sem.amount_spent||0).toLocaleString('en-US',{minimumFractionDigits:2})}</p></div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div style="background:#f0f7ff;padding:18px;border-radius:10px;border-left:5px solid #e91e63;margin-bottom:20px;">
+                                <h5 style="color:#880e4f;margin:0 0 12px 0;font-weight:700;font-size:13px;text-transform:uppercase;">📜 Certificate Information</h5>
+                                <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:16px;">
+                                    <div><span style="font-size:11px;text-transform:uppercase;color:#999;font-weight:700;">Received</span><p style="margin:4px 0 0 0;font-size:14px;color:#333;">${sem.certificate_received ? '<span style="color:#28a745;font-weight:600;">✓ Yes</span>' : 'No'}</p></div>
+                                    <div><span style="font-size:11px;text-transform:uppercase;color:#999;font-weight:700;">Certificate Number</span><p style="margin:4px 0 0 0;font-size:14px;color:#333;">${sem.certificate_number||'—'}</p></div>
+                                    <div><span style="font-size:11px;text-transform:uppercase;color:#999;font-weight:700;">Expiry Date</span><p style="margin:4px 0 0 0;font-size:14px;color:#333;">${fmt(sem.certificate_expiry)}</p></div>
+                                </div>
+                            </div>
+                            ${sem.learning_outcomes ? `<div style="background:#f0fff4;padding:18px;border-radius:10px;border-left:5px solid #28a745;margin-bottom:20px;"><h5 style="color:#1e7e34;margin:0 0 12px 0;font-weight:700;font-size:13px;text-transform:uppercase;">💡 Learning Outcomes</h5><p style="margin:0;color:#555;font-size:14px;line-height:1.7;">${sem.learning_outcomes}</p></div>` : ''}
+                        </div>
+                    `;
+                });
+            }
+
+            // LICENSES & CERTIFICATIONS SECTION
+            if (licenses.length > 0) {
+                html += `<div style="font-size:18px;font-weight:700;color:var(--azure-blue-dark);margin:35px 0 20px 0;padding-bottom:12px;border-bottom:3px solid var(--azure-blue-lighter);display:inline-block;">📜 Licenses & Certifications</div>`;
+                licenses.forEach((lic, index) => {
+                    html += `
+                        <div style="background:white;border-radius:12px;padding:24px;margin-bottom:25px;box-shadow:0 3px 12px rgba(0,0,0,0.08);">
+                            <div style="display:grid;grid-template-columns:1fr 1fr;gap:24px;margin-bottom:28px;">
+                                <div style="background:linear-gradient(135deg,#e3f2fd 0%,#f3f7fd 100%);padding:20px;border-radius:10px;border-left:5px solid #1976d2;">
+                                    <h5 style="color:#1565c0;margin:0 0 16px 0;font-weight:700;font-size:14px;text-transform:uppercase;letter-spacing:0.5px;">📜 License Information</h5>
+                                    <div style="display:grid;gap:14px;">
+                                        <div style="border-bottom:1px solid rgba(25,118,210,0.1);padding-bottom:12px;"><span style="font-size:11px;text-transform:uppercase;color:#999;font-weight:700;">License Name</span><p style="margin:4px 0 0 0;font-size:15px;color:#333;font-weight:600;">${lic.license_name||'—'}</p></div>
+                                        <div style="border-bottom:1px solid rgba(25,118,210,0.1);padding-bottom:12px;"><span style="font-size:11px;text-transform:uppercase;color:#999;font-weight:700;">License Type</span><p style="margin:4px 0 0 0;font-size:14px;color:#333;">${lic.license_type||'—'}</p></div>
+                                        <div style="border-bottom:1px solid rgba(25,118,210,0.1);padding-bottom:12px;"><span style="font-size:11px;text-transform:uppercase;color:#999;font-weight:700;">Issuing Body</span><p style="margin:4px 0 0 0;font-size:14px;color:#333;">${lic.issuing_body||'—'}</p></div>
+                                        <div style="border-bottom:1px solid rgba(25,118,210,0.1);padding-bottom:12px;"><span style="font-size:11px;text-transform:uppercase;color:#999;font-weight:700;">License Number</span><p style="margin:4px 0 0 0;font-size:14px;color:#333;font-weight:600;">${lic.license_number||'—'}</p></div>
+                                        <div><span style="font-size:11px;text-transform:uppercase;color:#999;font-weight:700;">Status</span><p style="margin:4px 0 0 0;font-size:14px;color:#333;">${lic.status=='Active'?'<span style="color:#28a745;font-weight:600;">● Active</span>':'<span style="color:#dc3545;">● '+lic.status+'</span>'||'—'}</p></div>
+                                    </div>
+                                </div>
+                                <div style="background:linear-gradient(135deg,#fff3e0 0%,#fffaf5 100%);padding:20px;border-radius:10px;border-left:5px solid #ffc107;">
+                                    <h5 style="color:#b89c3a;margin:0 0 16px 0;font-weight:700;font-size:14px;text-transform:uppercase;letter-spacing:0.5px;">📅 Important Dates</h5>
+                                    <div style="display:grid;gap:14px;">
+                                        <div style="border-bottom:1px solid rgba(255,193,7,0.1);padding-bottom:12px;"><span style="font-size:11px;text-transform:uppercase;color:#999;font-weight:700;">Date of Exam</span><p style="margin:4px 0 0 0;font-size:14px;color:#333;">${fmt(lic.date_of_exam)}</p></div>
+                                        <div style="border-bottom:1px solid rgba(255,193,7,0.1);padding-bottom:12px;"><span style="font-size:11px;text-transform:uppercase;color:#999;font-weight:700;">Date Issued</span><p style="margin:4px 0 0 0;font-size:14px;color:#333;">${fmt(lic.date_issued)}</p></div>
+                                        <div style="border-bottom:1px solid rgba(255,193,7,0.1);padding-bottom:12px;"><span style="font-size:11px;text-transform:uppercase;color:#999;font-weight:700;">Expiry Date</span><p style="margin:4px 0 0 0;font-size:14px;color:#333;font-weight:600;">${lic.expiry_date ? fmt(lic.expiry_date) : '<span style="color:#28a745;">No expiry</span>'}</p></div>
+                                        <div style="border-bottom:1px solid rgba(255,193,7,0.1);padding-bottom:12px;"><span style="font-size:11px;text-transform:uppercase;color:#999;font-weight:700;">Renewal Date</span><p style="margin:4px 0 0 0;font-size:14px;color:#333;">${fmt(lic.renewal_date)}</p></div>
+                                        <div><span style="font-size:11px;text-transform:uppercase;color:#999;font-weight:700;">Exam Rating</span><p style="margin:4px 0 0 0;font-size:14px;color:#333;font-weight:600;">${lic.rating ? parseFloat(lic.rating).toFixed(2)+'%' : '—'}</p></div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                });
+            }
+
+            // AWARDS & RECOGNITION SECTION
+            if (awards.length > 0) {
+                html += `<div style="font-size:18px;font-weight:700;color:var(--azure-blue-dark);margin:35px 0 20px 0;padding-bottom:12px;border-bottom:3px solid var(--azure-blue-lighter);display:inline-block;">🏆 Awards & Recognition</div>`;
+                awards.forEach((award, index) => {
+                    html += `
+                        <div style="background:white;border-radius:12px;padding:24px;margin-bottom:25px;box-shadow:0 3px 12px rgba(0,0,0,0.08);">
+                            <div style="background:linear-gradient(135deg,#fff8e1 0%,#fffbf0 100%);padding:22px;border-radius:10px;border-left:5px solid #ffc107;margin-bottom:24px;">
+                                <h5 style="color:#d4860b;margin:0 0 18px 0;font-weight:700;font-size:14px;text-transform:uppercase;letter-spacing:0.5px;">🏆 Award Information</h5>
+                                <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;">
+                                    <div><span style="font-size:11px;text-transform:uppercase;color:#999;font-weight:700;">Award Title</span><p style="margin:6px 0 0 0;font-size:15px;color:#333;font-weight:600;">${award.award_title||'—'}</p></div>
+                                    <div><span style="font-size:11px;text-transform:uppercase;color:#999;font-weight:700;">Award Type</span><p style="margin:6px 0 0 0;font-size:14px;color:#333;">${award.award_type||'—'}</p></div>
+                                    <div><span style="font-size:11px;text-transform:uppercase;color:#999;font-weight:700;">Awarding Body</span><p style="margin:6px 0 0 0;font-size:14px;color:#333;">${award.awarding_body||'—'}</p></div>
+                                    <div><span style="font-size:11px;text-transform:uppercase;color:#999;font-weight:700;">Date Received</span><p style="margin:6px 0 0 0;font-size:14px;color:#333;font-weight:600;">${fmt(award.date_received)}</p></div>
+                                </div>
+                            </div>
+                            ${award.description ? `<div style="background:#e7f3ff;padding:20px;border-radius:10px;border-left:5px solid #0066cc;"><h5 style="color:#004085;margin:0 0 14px 0;font-weight:700;font-size:13px;text-transform:uppercase;">📋 Description</h5><p style="margin:0;color:#555;font-size:14px;line-height:1.7;">${award.description}</p></div>` : ''}
+                        </div>
+                    `;
+                });
+            }
+
+            // VOLUNTARY WORK SECTION
+            if (voluntary.length > 0) {
+                html += `<div style="font-size:18px;font-weight:700;color:var(--azure-blue-dark);margin:35px 0 20px 0;padding-bottom:12px;border-bottom:3px solid var(--azure-blue-lighter);display:inline-block;">🤝 Voluntary Work</div>`;
+                voluntary.forEach((vol, index) => {
+                    html += `
+                        <div style="background:white;border-radius:12px;padding:24px;margin-bottom:25px;box-shadow:0 3px 12px rgba(0,0,0,0.08);">
+                            <div style="background:linear-gradient(135deg,#f0fff4 0%,#f5fffb 100%);padding:22px;border-radius:10px;border-left:5px solid #28a745;margin-bottom:24px;">
+                                <h5 style="color:#1e7e34;margin:0 0 18px 0;font-weight:700;font-size:14px;text-transform:uppercase;letter-spacing:0.5px;">🤝 Voluntary Work Information</h5>
+                                <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-bottom:0;">
+                                    <div><span style="font-size:11px;text-transform:uppercase;color:#999;font-weight:700;">Organization</span><p style="margin:6px 0 0 0;font-size:15px;color:#333;font-weight:600;">${vol.organization||'—'}</p></div>
+                                    <div><span style="font-size:11px;text-transform:uppercase;color:#999;font-weight:700;">Position / Nature of Work</span><p style="margin:6px 0 0 0;font-size:14px;color:#333;">${vol.position_nature_of_work||'—'}</p></div>
+                                    <div><span style="font-size:11px;text-transform:uppercase;color:#999;font-weight:700;">Start Date</span><p style="margin:6px 0 0 0;font-size:14px;color:#333;font-weight:600;">${vol.start_date ? fmt(vol.start_date) : '—'}</p></div>
+                                    <div><span style="font-size:11px;text-transform:uppercase;color:#999;font-weight:700;">End Date</span><p style="margin:6px 0 0 0;font-size:14px;color:#333;">${vol.end_date ? fmt(vol.end_date) : '<span style="color:var(--azure-blue);font-weight:600;">Ongoing</span>'}</p></div>
+                                    <div><span style="font-size:11px;text-transform:uppercase;color:#999;font-weight:700;">Hours per Week</span><p style="margin:6px 0 0 0;font-size:14px;color:#333;">${vol.hours_per_week ? vol.hours_per_week+' hrs/week' : '—'}</p></div>
+                                </div>
+                            </div>
+                            ${vol.description ? `<div style="background:#e7f3ff;padding:20px;border-radius:10px;border-left:5px solid #0066cc;"><h5 style="color:#004085;margin:0 0 14px 0;font-weight:700;font-size:13px;text-transform:uppercase;">📋 Description</h5><p style="margin:0;color:#555;font-size:14px;line-height:1.7;">${vol.description}</p></div>` : ''}
+                        </div>
+                    `;
+                });
+            }
+
+            // Get personal_info_id from employee data
+            const personalInfoId = employee ? employee.personal_info_id : 0;
+
+            html += `
+                <div class="nav-buttons-section" style="margin-top: 30px;">
+                    <h4>📋 Related Information</h4>
+                    <p style="color: #666; margin-bottom: 15px; font-size: 14px;">Access related records:</p>
+                    <div class="nav-button-group">
+                        <a href="personal_information.php?personal_info_id=${personalInfoId}" class="btn btn-info" title="View personal information">
+                            👤 Personal Information
+                        </a>
+                        <button onclick="viewDocumentsFromProfile(${employeeId})" class="btn btn-primary" title="View documents">
+                            📄 Documents
+                        </button>
+                        <button onclick="backToEmployeeProfile()" class="btn btn-success" title="Back to employee profile">
+                            👨‍💼 Back to Profile
+                        </button>
+                    </div>
+                </div>
+            </div>`;
+
+            content.innerHTML = html;
+            modal.style.display = 'block';
+            document.body.style.overflow = 'hidden';
+        }
+        function viewDocumentsFromProfile(employeeId) {
+            const docs = documentsData.filter(d => d.employee_id == employeeId);
+            const modal = document.getElementById('viewDetailsModal');
+            const title = document.getElementById('detailsTitle');
+            const content = document.getElementById('detailsContent');
+
+            title.textContent = `Employee Documents`;
+
+            if (docs.length === 0) {
+                content.innerHTML = `
+                    <div style="padding: 30px; text-align: center;">
+                        <p style="color: #666; font-size: 16px;">No documents found for this employee.</p>
+                        <div class="nav-buttons-section" style="margin-top: 30px;">
+                            <h4>📂 Back to Employee</h4>
+                            <div class="nav-button-group">
+                                <button onclick="viewPersonalInfo(${employeesData.find(e => e.employee_id == employeeId)?.personal_info_id})" class="btn btn-info">👤 Personal Info</button>
+                                <button onclick="viewEmploymentHistory(${employeeId})" class="btn btn-success">📊 Employment History</button>
+                                <button onclick="backToEmployeeProfile()" class="btn btn-primary">👨‍💼 Back to Profile</button>
+                            </div>
+                        </div>
+                    </div>
+                `;
+                modal.style.display = 'block';
+                return;
+            }
+
+            let html = '<div style="padding: 20px;">';
+            
+            docs.forEach(doc => {
+                const createDate = new Date(doc.created_at).toLocaleDateString('en-US', { 
+                    year: 'numeric', month: 'short', day: 'numeric' 
+                });
+                const expiryDate = doc.expiry_date ? 
+                    new Date(doc.expiry_date).toLocaleDateString('en-US', { 
+                        year: 'numeric', month: 'short', day: 'numeric' 
+                    }) : 'No Expiry';
+
+                const typeClass = 'type-' + doc.document_type.toLowerCase().replace(/ /g, '-');
+                const statusClass = 'status-' + doc.document_status.toLowerCase();
+                const expiryClass = 'expiry-' + doc.expiry_status.toLowerCase().replace(/ /g, '-');
+
+                html += `
+                <div style="background: white; padding: 15px; margin-bottom: 15px; border-radius: 8px; border-left: 4px solid var(--azure-blue);">
+                    <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 10px;">
+                        <div>
+                            <h5 style="color: var(--azure-blue-dark); margin: 0 0 5px 0; font-weight: 600;">${doc.document_name}</h5>
+                            <span class="document-type-badge ${typeClass}">${doc.document_type}</span>
+                            <span class="status-badge ${statusClass}" style="margin-left: 8px;">${doc.document_status}</span>
+                        </div>
+                        <span class="expiry-badge expiry-${expiryClass}">${doc.expiry_status}</span>
+                    </div>
+                    <div style="font-size: 13px; color: #666; margin-top: 10px;">
+                        <div><strong>Created:</strong> ${createDate}</div>
+                        <div><strong>Expiry:</strong> ${expiryDate}</div>
+                        ${doc.file_path ? `<div><strong>File:</strong> <a href="${doc.file_path}" target="_blank" class="download-link">📥 Download</a></div>` : ''}
+                    </div>
+                </div>
+                `;
+            });
+
+            const employee = employeesData.find(e => e.employee_id == employeeId);
+            const personalInfoId = employee ? employee.personal_info_id : 0;
+
+            html += `
+                <div class="nav-buttons-section">
+                    <h4>📂 Back to Employee</h4>
+                    <p style="color: #666; margin-bottom: 15px; font-size: 14px;">Navigate to related information:</p>
+                    <div class="nav-button-group">
+                        <button onclick="viewPersonalInfo(${personalInfoId})" class="btn btn-info" title="View personal information">
+                            👤 Personal Info
+                        </button>
+                        <button onclick="viewEmploymentHistory(${employeeId})" class="btn btn-success" title="View employment history">
+                            📊 Employment History
+                        </button>
+                        <button onclick="backToEmployeeProfile()" class="btn btn-primary" title="Back to employee profile">
+                            👨‍💼 Back to Profile
+                        </button>
+                    </div>
+                </div>
+            </div>
+            `;
+
+            content.innerHTML = html;
+            modal.style.display = 'block';
+            document.body.style.overflow = 'hidden';
+        }
+
+        // Back to Employee Profile
+        function backToEmployeeProfile() {
+            if (currentViewingEmployeeId) {
+                viewEmployeeDetails(currentViewingEmployeeId);
+            }
+        }
+
         // Close modal when clicking outside
         window.onclick = function(event) {
-            const modal = document.getElementById('employeeModal');
-            if (event.target === modal) {
+            const employeeModal = document.getElementById('employeeModal');
+            const detailsModal = document.getElementById('viewDetailsModal');
+            
+            if (event.target === employeeModal) {
                 closeModal();
+            }
+            if (event.target === detailsModal) {
+                closeDetailsModal();
             }
         }
 
