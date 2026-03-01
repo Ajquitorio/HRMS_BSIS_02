@@ -4153,3 +4153,17 @@
 2026-02-21 15:57:35 Error: [2] move_uploaded_file(): Unable to move &quot;C:\Program Files\xampp\tmp\php75A0.tmp&quot; to &quot;uploads/leave_documents/6999d5ef9c3df_test_doc.pdf&quot; - C:\Program Files\xampp\htdocs\HRMS_BSIS_02\employee_leave.php:56
 2026-02-21 15:57:53 Error: [2] Undefined variable $row - C:\Program Files\xampp\htdocs\HRMS_BSIS_02\login.php:126
 2026-02-21 15:57:53 Error: [2] Trying to access array offset on value of type null - C:\Program Files\xampp\htdocs\HRMS_BSIS_02\login.php:126
+2026-02-28 14:08:05 Error: [2] Undefined variable $row - C:\Program Files\xampp\htdocs\HRMS_BSIS_02\login.php:127
+2026-02-28 14:08:05 Error: [2] Trying to access array offset on value of type null - C:\Program Files\xampp\htdocs\HRMS_BSIS_02\login.php:127
+2026-02-28 14:32:30 Error: [2] Undefined variable $row - C:\Program Files\xampp\htdocs\HRMS_BSIS_02\login.php:127
+2026-02-28 14:32:30 Error: [2] Trying to access array offset on value of type null - C:\Program Files\xampp\htdocs\HRMS_BSIS_02\login.php:127
+2026-02-28 14:37:36 Error: [2] Undefined variable $row - C:\Program Files\xampp\htdocs\HRMS_BSIS_02\login.php:127
+2026-02-28 14:37:36 Error: [2] Trying to access array offset on value of type null - C:\Program Files\xampp\htdocs\HRMS_BSIS_02\login.php:127
+2026-03-01 12:15:21 Error: [2] Undefined variable $row - C:\Program Files\xampp\htdocs\HRMS_BSIS_02\login.php:127
+2026-03-01 12:15:21 Error: [2] Trying to access array offset on value of type null - C:\Program Files\xampp\htdocs\HRMS_BSIS_02\login.php:127
+2026-03-01 12:16:47 Error: [2] Undefined variable $row - C:\Program Files\xampp\htdocs\HRMS_BSIS_02\login.php:127
+2026-03-01 12:16:47 Error: [2] Trying to access array offset on value of type null - C:\Program Files\xampp\htdocs\HRMS_BSIS_02\login.php:127
+2026-03-01 13:31:28 Error: [2] Undefined variable $row - C:\Program Files\xampp\htdocs\HRMS_BSIS_02\login.php:127
+2026-03-01 13:31:28 Error: [2] Trying to access array offset on value of type null - C:\Program Files\xampp\htdocs\HRMS_BSIS_02\login.php:127
+2026-03-01 13:46:57 Error: [2] Undefined variable $row - C:\Program Files\xampp\htdocs\HRMS_BSIS_02\login.php:127
+2026-03-01 13:46:57 Error: [2] Trying to access array offset on value of type null - C:\Program Files\xampp\htdocs\HRMS_BSIS_02\login.php:127

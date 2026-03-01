@@ -67,12 +67,6 @@ if (!$is_logged_in || $user_role !== 'employee') {
                 <i class="fas fa-calendar-alt"></i> Leave Management
             </a>
         </li>
-
-        <li class="nav-item">
-            <a class="nav-link <?php echo isActiveMenu('employee_attendance.php'); ?>" href="employee_attendance.php">
-                <i class="fas fa-calendar-check"></i> My Attendance
-            </a>
-        </li>
         
         <li class="nav-item">
             <a class="nav-link <?php echo isActiveMenu('payslips.php'); ?>" href="payslips.php">
